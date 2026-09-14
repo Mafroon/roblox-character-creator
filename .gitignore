@@ -3,3 +3,6 @@ Thumbs.db
 Desktop.ini
 *.tmp
 *~
+
+# ZCode session artifacts
+.zcode/

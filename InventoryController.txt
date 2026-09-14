@@ -1,0 +1,413 @@
+--[[
+	InventoryController - клиентский модуль инвентарей и цветов.
+	ModuleScript: поместить в ReplicatedStorage с именем "InventoryController".
+	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+
+	Отвечает за: инвентари категорий (одежда, волосы и т.д.), цветовые
+	палитры с ColorPicker, текстовые метки экипировки и рандомайзер.
+	Снаружи используются InventoryController.init(deps) и .closeAll().
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local InventoryController = {}
+
+-- ===================== REMOTE ОБЪЕКТЫ И ШАБЛОНЫ =====================
+local GetInventoryItems = ReplicatedStorage:WaitForChild("GetInventoryItems")
+local EquipItemEvent = ReplicatedStorage:WaitForChild("EquipItem")
+local ChangePartColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
+local GetPlayerSkinColor = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
+local ColorPickerModule = require(ReplicatedStorage:WaitForChild("ColorPicker"))
+local itemTemplate = ReplicatedStorage:WaitForChild("Templates"):WaitForChild("InventoryItemTemplate")
+
+-- ===================== ПАЛИТРЫ =====================
+local pleasantColors = {
+	Color3.fromRGB(255, 179, 186), Color3.fromRGB(255, 223, 186),
+	Color3.fromRGB(255, 255, 186), Color3.fromRGB(186, 255, 201),
+	Color3.fromRGB(186, 225, 255), Color3.fromRGB(210, 186, 255),
+	Color3.fromRGB(222, 184, 135), Color3.fromRGB(160, 120, 90),
+	Color3.fromRGB(150, 130, 110), Color3.fromRGB(100, 120, 150),
+	Color3.fromRGB(70, 90, 70),    Color3.fromRGB(150, 150, 150),
+	Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0),
+	Color3.fromRGB(50, 50, 50),
+}
+local accentColors = {
+	Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
+	Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
+	Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
+}
+local skinColors = {
+	Color3.fromRGB(255, 205, 148), Color3.fromRGB(234, 192, 134),
+	Color3.fromRGB(210, 170, 120), Color3.fromRGB(181, 136, 99),
+	Color3.fromRGB(141, 101, 72),  Color3.fromRGB(102, 71, 45),
+	Color3.fromRGB(77, 53, 33),
+}
+
+local rng = Random.new()
+local function getPleasantColor()
+	if rng:NextNumber() < 0.07 then
+		return accentColors[rng:NextInteger(1, #accentColors)]
+	else
+		return pleasantColors[rng:NextInteger(1, #pleasantColors)]
+	end
+end
+
+-- ===================== СОСТОЯНИЕ =====================
+local creationGui = nil
+local allFrames = {}                -- множество всех инвентарей и палитр
+local currentOpenInventory = nil    -- открытый сейчас инвентарь или палитра
+local currentEquipped = {}          -- [категория] = имя надетого предмета
+local colorPickers = {}             -- [палитра] = открытый ColorPicker
+local colorPalettes = {}            -- список всех цветовых палитр (для closeOtherPalettes)
+local populatedInventories = {}     -- инвентари, уже заполненные предметами
+local inventoryMapping = {}         -- [фрейм инвентаря] = имя категории
+local currentCategoryColors = {
+	Eyes = Color3.new(1, 1, 1),
+	FacialHair = Color3.new(1, 1, 1),
+	Hair = Color3.new(1, 1, 1),
+	Race = Color3.new(1, 1, 1),
+	Skin = Color3.new(1, 1, 1),
+}
+local skinColorFrame = nil          -- квадратик предпросмотра цвета кожи
+local categoryItemCache = {}        -- кэш предметов для рандомайзера
+local equipTextLabels = {}          -- [категория] = TextLabel с названием предмета
+
+-- ===================== ЗАКРЫТИЕ ИНВЕНТАРЕЙ =====================
+local function closeAllInventories()
+	for pal, picker in pairs(colorPickers) do
+		picker:Destroy()
+		colorPickers[pal] = nil
+	end
+	for frame in pairs(allFrames) do
+		frame.Visible = false
+	end
+	currentOpenInventory = nil
+	print("Все инвентари и палитры закрыты.")
+end
+InventoryController.closeAll = closeAllInventories
+
+-- ===================== ЗАПОЛНЕНИЕ ИНВЕНТАРЕЙ =====================
+local function populateInventory(inventoryFrame, categoryName)
+	local scrollingFrame = inventoryFrame:WaitForChild("ScrollingFrame")
+	for _, child in ipairs(scrollingFrame:GetChildren()) do
+		if child:GetAttribute("Item") == true then
+			child:Destroy()
+		end
+	end
+
+	local items = GetInventoryItems:InvokeServer(categoryName)
+	if not items then
+		warn("Не удалось загрузить инвентарь '" .. categoryName .. "'")
+		return
+	end
+
+	for _, itemData in ipairs(items) do
+		local itemClone = itemTemplate:Clone()
+		itemClone:SetAttribute("Item", true)
+		itemClone.Name = itemData.name .. "_Frame"
+		local button = itemClone:FindFirstChild("ImageButton")
+		if button then
+			button.Activated:Connect(function()
+				local equippedName = currentEquipped[categoryName]
+				if equippedName == itemData.name then
+					EquipItemEvent:FireServer(categoryName, nil)
+					print("Снятие: " .. itemData.name .. " из " .. categoryName)
+				else
+					EquipItemEvent:FireServer(categoryName, itemData.name)
+					print("Экипировка: " .. itemData.name .. " из " .. categoryName)
+				end
+			end)
+		end
+		itemClone.Parent = scrollingFrame
+	end
+	populatedInventories[inventoryFrame] = true
+end
+
+-- ===================== ЦВЕТОВЫЕ ПАЛИТРЫ =====================
+-- Закрывает все палитры, кроме указанной (вместе с их пикерами)
+local function closeOtherPalettes(currentPalette)
+	for _, pal in ipairs(colorPalettes) do
+		if pal.Visible and pal ~= currentPalette then
+			if colorPickers[pal] then
+				colorPickers[pal]:Destroy()
+				colorPickers[pal] = nil
+			end
+			pal.Visible = false
+		end
+	end
+end
+
+local function openColorPicker(palette, categoryName, parentInventory)
+	if currentOpenInventory == palette then
+		if colorPickers[palette] then
+			colorPickers[palette]:Destroy()
+			colorPickers[palette] = nil
+		end
+		palette.Visible = false
+		currentOpenInventory = nil
+		print("Палитра закрыта: " .. palette.Name)
+		return
+	end
+
+	closeOtherPalettes(palette)
+
+	if parentInventory then
+		parentInventory.Visible = true
+	end
+
+	palette.Visible = true
+	currentOpenInventory = palette
+
+	local initialColor = currentCategoryColors[categoryName] or Color3.new(1, 1, 1)
+
+	local picker = nil
+	local function onColorChanged(newColor)
+		currentCategoryColors[categoryName] = newColor
+		ChangePartColorEvent:FireServer(categoryName, newColor)
+		print("Предпросмотр " .. categoryName .. ": " .. tostring(newColor))
+	end
+
+	local function onClosed()
+		palette.Visible = false
+		if currentOpenInventory == palette then
+			currentOpenInventory = nil
+		end
+		if colorPickers[palette] == picker then
+			colorPickers[palette] = nil
+		end
+		if categoryName == "Skin" then
+			skinColorFrame.BackgroundColor3 = currentCategoryColors.Skin
+		end
+		print("Пикер закрыт: " .. categoryName)
+	end
+
+	picker = ColorPickerModule.new(palette, initialColor, onColorChanged, onClosed)
+	colorPickers[palette] = picker
+end
+
+local function switchToMainInventory(targetFrame)
+	if currentOpenInventory == targetFrame then
+		closeAllInventories()
+		return
+	end
+
+	for pal, picker in pairs(colorPickers) do
+		picker:Destroy()
+		colorPickers[pal] = nil
+	end
+	for frame in pairs(allFrames) do
+		frame.Visible = false
+	end
+
+	targetFrame.Visible = true
+	currentOpenInventory = targetFrame
+	print("Открыт: " .. targetFrame.Name)
+
+	if not populatedInventories[targetFrame] and inventoryMapping[targetFrame] then
+		populateInventory(targetFrame, inventoryMapping[targetFrame])
+	end
+end
+
+-- ===================== ПОДКЛЮЧЕНИЕ КНОПОК =====================
+-- Подключает кнопку, найденную по пути от CreationMenuGui
+local function connectMainButton(guiPath, targetFrame)
+	local btn = creationGui
+	for _, child in ipairs(guiPath) do
+		btn = btn:WaitForChild(child)
+	end
+	btn.MouseButton1Click:Connect(function()
+		switchToMainInventory(targetFrame)
+	end)
+end
+
+-- Подключает кнопку открытия цветовой палитры
+local function connectColorButton(guiPath, colorPalette, parentInventory, categoryName)
+	local btn = creationGui
+	for _, child in ipairs(guiPath) do
+		btn = btn:WaitForChild(child)
+	end
+	btn.MouseButton1Click:Connect(function()
+		openColorPicker(colorPalette, categoryName, parentInventory)
+	end)
+end
+
+-- ===================== РАНДОМАЙЗЕР =====================
+local function preloadCategories()
+	-- ИСПРАВЛЕНО: добавлена "Race" для корректной работы рандомайзера
+	local cats = {"Shirt", "Pants", "Extra", "Eyes", "Hair", "FacialHair", "Mouth", "Race"}
+	for _, cat in ipairs(cats) do
+		categoryItemCache[cat] = GetInventoryItems:InvokeServer(cat)
+	end
+end
+
+-- ===================== ТЕКСТОВЫЕ МЕТКИ ЭКИПИРОВКИ =====================
+local function updateEquipText(category, itemName)
+	local label = equipTextLabels[category]
+	if not label then return end
+	label.Text = itemName or "..."
+end
+
+-- ===================== ИНИЦИАЛИЗАЦИЯ =====================
+-- init(deps): deps = { creationGui = CreationMenuGui }
+function InventoryController.init(deps)
+	creationGui = deps.creationGui
+
+	local inventoryContainer = creationGui:WaitForChild("InventoryColor")
+
+	local Inventory1Pants = inventoryContainer:WaitForChild("Inventory1Pants")
+	local Inventory1Shirt = inventoryContainer:WaitForChild("Inventory1Shirt")
+	local Inventory1Extra = inventoryContainer:WaitForChild("Inventory1Extra")
+	local Inventory1Mouth = inventoryContainer:WaitForChild("Inventory1Mouth")
+	local Inventory2Eyes = inventoryContainer:WaitForChild("Inventory2Eyes")
+	local Inventory2FacialHair = inventoryContainer:WaitForChild("Inventory2FacialHair")
+	local Inventory2Hair = inventoryContainer:WaitForChild("Inventory2Hair")
+	local Inventory2Race = inventoryContainer:WaitForChild("Inventory2Race")
+
+	local ColorSkin = inventoryContainer:WaitForChild("ColorSkin")
+	local ColorEyes = inventoryContainer:WaitForChild("ColorEyes")
+	local ColorFacialHair = inventoryContainer:WaitForChild("ColorFacialHair")
+	local ColorHair = inventoryContainer:WaitForChild("ColorHair")
+	local ColorRace = inventoryContainer:WaitForChild("ColorRace")
+
+	colorPalettes = {ColorSkin, ColorEyes, ColorFacialHair, ColorHair, ColorRace}
+
+	-- Регистрируем и скрываем все инвентари и палитры
+	for _, frame in ipairs({
+		Inventory1Pants, Inventory1Shirt, Inventory1Extra, Inventory1Mouth,
+		Inventory2Eyes, Inventory2FacialHair, Inventory2Hair, Inventory2Race,
+		ColorSkin, ColorEyes, ColorFacialHair, ColorHair, ColorRace,
+	}) do
+		allFrames[frame] = true
+		frame.Visible = false
+	end
+
+	inventoryMapping = {
+		[Inventory1Extra] = "Extra",
+		[Inventory1Mouth] = "Mouth",
+		[Inventory1Pants] = "Pants",
+		[Inventory2Race]  = "Race",
+		[Inventory1Shirt] = "Shirt",
+		[Inventory2Eyes]  = "Eyes",
+		[Inventory2FacialHair] = "FacialHair",
+		[Inventory2Hair]  = "Hair",
+	}
+
+	-- Квадратик предпросмотра цвета кожи
+	skinColorFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("Frame")
+	skinColorFrame.BackgroundColor3 = currentCategoryColors.Skin
+
+	-- Запрашиваем у сервера сохранённый цвет кожи (если есть)
+	local savedSkin = GetPlayerSkinColor:InvokeServer()
+	if savedSkin then
+		currentCategoryColors.Skin = savedSkin
+		skinColorFrame.BackgroundColor3 = savedSkin
+		print("Начальный цвет кожи загружен:", savedSkin)
+	else
+		print("Цвет кожи ещё не сохранён, используется дефолтный")
+	end
+
+	-- Кнопки открытия инвентарей
+	connectMainButton({"CustomizeLeft", "Frame", "Pants", "Frame", "Frame", "PantsButton"}, Inventory1Pants)
+	connectMainButton({"CustomizeLeft", "Frame", "Race", "Frame", "Frame", "RaceButton"}, Inventory2Race)
+	connectMainButton({"CustomizeLeft", "Frame", "Shirt", "Frame", "Frame", "ShirtButton"}, Inventory1Shirt)
+	connectMainButton({"CustomizeRight", "Frame", "Extra", "Frame", "Frame", "ExtraButton"}, Inventory1Extra)
+	connectMainButton({"CustomizeRight", "Frame", "Eyes", "Frame", "Frame", "EyesButton"}, Inventory2Eyes)
+	connectMainButton({"CustomizeRight", "Frame", "FacialHair", "Frame", "Frame", "FacialHairButton"}, Inventory2FacialHair)
+	connectMainButton({"CustomizeRight", "Frame", "Hair", "Frame", "Frame", "HairButton"}, Inventory2Hair)
+	connectMainButton({"CustomizeRight", "Frame", "Mouth", "Frame", "Frame", "MouthButton"}, Inventory1Mouth)
+
+	-- Кнопка цвета кожи (особый случай: палитра без родительского инвентаря)
+	local skinColorButton = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Frame"):WaitForChild("SkinColorButton")
+	skinColorButton.MouseButton1Click:Connect(function()
+		if currentOpenInventory == ColorSkin then
+			-- Повторный клик закрывает палитру одним нажатием
+			if colorPickers[ColorSkin] then
+				colorPickers[ColorSkin]:Destroy()
+				colorPickers[ColorSkin] = nil
+			end
+			ColorSkin.Visible = false
+			currentOpenInventory = nil
+		else
+			closeAllInventories()
+			openColorPicker(ColorSkin, "Skin", nil)
+		end
+	end)
+
+	-- Кнопки открытия палитр внутри инвентарей
+	connectColorButton({"InventoryColor", "Inventory2Eyes", "Frame", "ColorButton"}, ColorEyes, Inventory2Eyes, "Eyes")
+	connectColorButton({"InventoryColor", "Inventory2FacialHair", "Frame", "ColorButton"}, ColorFacialHair, Inventory2FacialHair, "FacialHair")
+	connectColorButton({"InventoryColor", "Inventory2Hair", "Frame", "ColorButton"}, ColorHair, Inventory2Hair, "Hair")
+	connectColorButton({"InventoryColor", "Inventory2Race", "Frame", "ColorButton"}, ColorRace, Inventory2Race, "Race")
+
+	-- Рандомайзер: предзагружаем категории и подключаем кнопку
+	preloadCategories()
+
+	local randomButton = creationGui:WaitForChild("Random"):WaitForChild("Frame"):WaitForChild("RandomButton")
+	randomButton.MouseButton1Click:Connect(function()
+		closeAllInventories()
+
+		-- Обязательные категории (всегда новые предметы)
+		local required = {"Shirt", "Pants", "Eyes", "Mouth", "Race"}
+		for _, cat in ipairs(required) do
+			local items = categoryItemCache[cat]
+			if items and #items > 0 then
+				local chosen = items[rng:NextInteger(1, #items)]
+				EquipItemEvent:FireServer(cat, chosen.name)
+			end
+		end
+
+		-- Опциональные категории с вероятностями и возможностью снятия
+		local optional = {
+			{name = "Hair",       chance = 0.85},
+			{name = "FacialHair", chance = 0.20},
+			{name = "Extra",      chance = 0.20},
+		}
+		for _, opt in ipairs(optional) do
+			local items = categoryItemCache[opt.name]
+			if items and #items > 0 and rng:NextNumber() < opt.chance then
+				local chosen = items[rng:NextInteger(1, #items)]
+				EquipItemEvent:FireServer(opt.name, chosen.name)
+			else
+				EquipItemEvent:FireServer(opt.name, nil)
+			end
+		end
+
+		-- Применяем цвета
+		local colorable = {"Eyes", "Hair", "FacialHair", "Race"}
+		for _, cat in ipairs(colorable) do
+			local col = getPleasantColor()
+			currentCategoryColors[cat] = col
+			ChangePartColorEvent:FireServer(cat, col)
+		end
+
+		-- Цвет кожи отдельно (телесная палитра)
+		local skinCol = skinColors[rng:NextInteger(1, #skinColors)]
+		currentCategoryColors.Skin = skinCol
+		ChangePartColorEvent:FireServer("Skin", skinCol)
+		skinColorFrame.BackgroundColor3 = skinCol
+
+		print("Рандомайзер выполнен!")
+	end)
+
+	-- Текстовые метки экипировки
+	local leftFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame")
+	local rightFrame = creationGui:WaitForChild("CustomizeRight"):WaitForChild("Frame")
+	equipTextLabels = {
+		Race = leftFrame:WaitForChild("Race"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextRace"),
+		Shirt = leftFrame:WaitForChild("Shirt"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextShirt"),
+		Pants = leftFrame:WaitForChild("Pants"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextPants"),
+		Eyes = rightFrame:WaitForChild("Eyes"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextEyes"),
+		Extra = rightFrame:WaitForChild("Extra"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextExtra"),
+		Mouth = rightFrame:WaitForChild("Mouth"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextMouth"),
+		FacialHair = rightFrame:WaitForChild("FacialHair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextFacialHair"),
+		Hair = rightFrame:WaitForChild("Hair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextHair"),
+	}
+
+	-- Сервер подтверждает экипировку - обновляем метки
+	EquipItemEvent.OnClientEvent:Connect(function(data)
+		currentEquipped[data.category] = data.item
+		updateEquipText(data.category, data.item)
+	end)
+end
+
+return InventoryController

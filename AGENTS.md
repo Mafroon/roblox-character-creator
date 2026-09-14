@@ -15,7 +15,10 @@ Flat collection of standalone Roblox **Luau** script snippets stored as `.txt` f
 | `MaleFemale` | gender-change server script |
 | `ReplaceAvatarWithRig` | Script in `ServerScriptService` (custom spawn, `CharacterAutoLoads = false`) |
 | `RotateScript` | LocalScript in CreationMenuGui |
-| `SceneTransition` | LocalScript in `StarterGui` (main menu + character editor; largest file) |
+| `SceneTransition` | LocalScript in `StarterGui` (MainMenuGui) — orchestrator; requires the 3 modules below |
+| `SceneEffects` | ModuleScript `SceneEffects` in `ReplicatedStorage` — camera yaw rig + menu show/hide tweens |
+| `InventoryController` | ModuleScript `InventoryController` in `ReplicatedStorage` — inventories, color palettes, randomizer, equip labels |
+| `ElementMenu` | ModuleScript `ElementMenu` in `ReplicatedStorage` — element info frames |
 | `Teleport` | Script in `ServerScriptService` (`GAME_PLACE_ID = 95945939718701` hardcoded) |
 
 ## CRITICAL: file encoding
@@ -29,6 +32,8 @@ Files are **Windows-1251** (Cyrillic comments) with **CRLF** line endings. Read/
 ## Cross-file contract (do not rename unilaterally)
 
 Scripts communicate through instances expected in the DataModel — renaming in one file breaks the others:
+
+- **Module requires**: `SceneTransition` requires the ModuleScripts `SceneEffects`, `InventoryController`, `ElementMenu` from `ReplicatedStorage` by exact name (via `WaitForChild`). Module init signatures are documented in each file's header comment.
 
 - **ReplicatedStorage**: RemoteEvents `RequestTeleport`, `ElementChosenEvent`, `ChangeGenderEvent`, `ChangePartColorEvent`, `EquipItem`, `GetInventoryItems`, `GetPlayerSkinColor`, `ResetElementChoiceEvent`; BindableEvent `StartGameEvent` (Bindable, not Remote — fired by LoadingScript, awaited by SceneTransition); ModuleScript `ColorPicker`.
 - **PlayerGui ScreenGuis**: `MainMenuGui`, `ElementMenuGui`, `CreationMenuGui`, `LoadingScreen`, `EntranceGui` (plus many named child frames/buttons).

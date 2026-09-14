@@ -1,5 +1,17 @@
--- Главное меню и редактор персонажа (Client-Side LocalScript)
--- Поместите в StarterGui (например, внутрь MainMenuGui)
+--[[
+	Главное меню и редактор персонажа (Client-Side LocalScript)
+	Поместить в StarterGui (внутрь MainMenuGui).
+
+	Оркестратор: ждёт StartGameEvent от загрузочного экрана, инициализирует
+	модули, подключает кнопки и управляет переходами между экранами
+	(меню - редактор - стихии - финальный полёт).
+
+	Требует три ModuleScript в ReplicatedStorage (создайте их и вставьте
+	содержимое соответствующих .txt файлов, имена должны совпадать):
+	  - SceneEffects          (SceneEffects.txt)         - анимации переходов
+	  - InventoryController   (InventoryController.txt)  - инвентари и цвета
+	  - ElementMenu           (ElementMenu.txt)          - инфо-фреймы стихий
+]]
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
@@ -12,25 +24,19 @@ startGameEvent.Event:Wait()
 local player = Players.LocalPlayer
 -- Ждём, пока сервер создаст StringValue (при спавне персонажа)
 local genderValue = player:WaitForChild("PlayerGender", 10)  -- 10 сек таймаут
-local function getCurrentGender()
-	return genderValue and genderValue.Value
-end
 local playerGui = player:WaitForChild("PlayerGui")
 local mainMenu = playerGui:WaitForChild("MainMenuGui")
-local creationMenu = playerGui:WaitForChild("CreationMenuGui")
+local creationGui = playerGui:WaitForChild("CreationMenuGui")
 
 mainMenu.Enabled = true
-creationMenu.Enabled = true
+creationGui.Enabled = true
 
--- ID торсов (должны совпадать с серверными)
-local MALE_TORSO_ID = 0
-local FEMALE_TORSO_ID = 138660610692885
+-- ===================== МОДУЛИ =====================
+local SceneEffects = require(ReplicatedStorage:WaitForChild("SceneEffects"))
+local InventoryController = require(ReplicatedStorage:WaitForChild("InventoryController"))
+local ElementMenu = require(ReplicatedStorage:WaitForChild("ElementMenu"))
 
 -- ===================== REMOTE ОБЪЕКТЫ =====================
-local GetInventoryItems = ReplicatedStorage:WaitForChild("GetInventoryItems")
-local EquipItemEvent = ReplicatedStorage:WaitForChild("EquipItem")
-local ChangePartColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
-local ColorPickerModule = require(ReplicatedStorage:WaitForChild("ColorPicker"))
 local ElementChosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
 -- ===================== ОСНОВНЫЕ ЭЛЕМЕНТЫ ИНТЕРФЕЙСА =====================
@@ -39,7 +45,6 @@ local mainContainer = screenGui:WaitForChild("MainContainer")
 local slot1 = mainContainer:WaitForChild("Slot1")
 local slot2 = mainContainer:WaitForChild("Slot2")
 
-local creationGui = playerGui:WaitForChild("CreationMenuGui")
 local buttonContainer = creationGui:WaitForChild("ButtonContainer")
 local backBtn = buttonContainer:WaitForChild("BackButton")
 local nextBtn = buttonContainer:WaitForChild("NextButton")
@@ -59,45 +64,37 @@ local bgRightOriginalPos = UDim2.new(0.75, 0, 0.5, 0)
 
 local elementMenu = playerGui:WaitForChild("ElementMenuGui")
 local elementButtonContainer = elementMenu:WaitForChild("ButtonContainer")
-local elementBackFrameUp = elementMenu:WaitForChild("BackFrameUp")
-local elementBackFrameDown = elementMenu:WaitForChild("BackFrameDown")
-local elementBackFrame = elementMenu:WaitForChild("BackFrame")
 local elementBackButton = elementButtonContainer:WaitForChild("BackButton")
-local yourChoiceFrame = elementMenu:WaitForChild("YourChoiceFrame")
-yourChoiceFrame.Visible = false
-yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)   -- начальная позиция скрыта снизу
 
--- ===================== ПАЛИТРЫ =====================
-local pleasantColors = {
-	Color3.fromRGB(255, 179, 186), Color3.fromRGB(255, 223, 186),
-	Color3.fromRGB(255, 255, 186), Color3.fromRGB(186, 255, 201),
-	Color3.fromRGB(186, 225, 255), Color3.fromRGB(210, 186, 255),
-	Color3.fromRGB(222, 184, 135), Color3.fromRGB(160, 120, 90),
-	Color3.fromRGB(150, 130, 110), Color3.fromRGB(100, 120, 150),
-	Color3.fromRGB(70, 90, 70),    Color3.fromRGB(150, 150, 150),
-	Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0),
-	Color3.fromRGB(50, 50, 50),
-}
-local accentColors = {
-	Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
-	Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
-	Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-}
-local skinColors = {
-	Color3.fromRGB(255, 205, 148), Color3.fromRGB(234, 192, 134),
-	Color3.fromRGB(210, 170, 120), Color3.fromRGB(181, 136, 99),
-	Color3.fromRGB(141, 101, 72),  Color3.fromRGB(102, 71, 45),
-	Color3.fromRGB(77, 53, 33),
-}
+-- ===================== СОСТОЯНИЕ =====================
+local isTransitioning = false
+local originalMainPos = mainContainer.Position
+local cameraBasePos = Vector3.new(0, 3, 0)
 
-local rng = Random.new()
-local function getPleasantColor()
-	if rng:NextNumber() < 0.07 then
-		return accentColors[rng:NextInteger(1, #accentColors)]
-	else
-		return pleasantColors[rng:NextInteger(1, #pleasantColors)]
-	end
-end
+-- ===================== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ =====================
+ElementMenu.init({
+	elementMenu = elementMenu,
+	yourChoiceFrame = elementMenu:WaitForChild("YourChoiceFrame"),
+})
+InventoryController.init({ creationGui = creationGui })
+SceneEffects.init({
+	buttonContainer = buttonContainer,
+	customizeLeft = customizeLeft,
+	customizeRight = customizeRight,
+	customizeText = customizeText,
+	leftRight = leftRight,
+	randomFrame = randomFrame,
+	elementMenu = elementMenu,
+	elementButtonContainer = elementButtonContainer,
+	elementBackFrameUp = elementMenu:WaitForChild("BackFrameUp"),
+	elementBackFrameDown = elementMenu:WaitForChild("BackFrameDown"),
+	elementBackFrame = elementMenu:WaitForChild("BackFrame"),
+	yourChoiceFrame = elementMenu:WaitForChild("YourChoiceFrame"),
+	bgLeft = bgLeft,
+	bgRight = bgRight,
+	bgLeftOriginalPos = bgLeftOriginalPos,
+	bgRightOriginalPos = bgRightOriginalPos,
+})
 
 -- Изначально скрываем элементы редактора
 buttonContainer.Visible = false
@@ -108,414 +105,76 @@ leftRight.Visible = false
 randomFrame.Visible = false
 elementMenu.Enabled = false
 
-local isTransitioning = false
-local originalMainPos = mainContainer.Position
-local cameraBasePos = Vector3.new(0, 3, 0)
+-- ===================== СМЕНА ПОЛА =====================
+local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")
 
--- ===================== ИНВЕНТАРИ =====================
-local inventoryContainer = playerGui:WaitForChild("CreationMenuGui"):WaitForChild("InventoryColor")
-local itemTemplate = ReplicatedStorage:WaitForChild("Templates"):WaitForChild("InventoryItemTemplate")
+local genderFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("Gender")
 
-local allFrames = {}
-local function registerFrame(frame)
-	allFrames[frame] = true
-end
+local ACTIVE_COLOR = Color3.fromRGB(180, 180, 180)
+local MALE_INACTIVE_COLOR = Color3.fromRGB(62, 127, 206)
+local FEMALE_INACTIVE_COLOR = Color3.fromRGB(194, 124, 206)
 
-local Inventory1Pants = inventoryContainer:WaitForChild("Inventory1Pants")
-local Inventory1Shirt = inventoryContainer:WaitForChild("Inventory1Shirt")
-local Inventory1Extra = inventoryContainer:WaitForChild("Inventory1Extra")
-local Inventory1Mouth = inventoryContainer:WaitForChild("Inventory1Mouth")
-local Inventory2Eyes = inventoryContainer:WaitForChild("Inventory2Eyes")
-local Inventory2FacialHair = inventoryContainer:WaitForChild("Inventory2FacialHair")
-local Inventory2Hair = inventoryContainer:WaitForChild("Inventory2Hair")
-local Inventory2Race = inventoryContainer:WaitForChild("Inventory2Race")
+local maleButton = genderFrame:WaitForChild("Frame"):WaitForChild("MaleButton")
+local femaleButton = genderFrame:WaitForChild("Frame"):WaitForChild("FemaleButton")
 
-local ColorSkin = inventoryContainer:WaitForChild("ColorSkin")
-local ColorEyes = inventoryContainer:WaitForChild("ColorEyes")
-local ColorFacialHair = inventoryContainer:WaitForChild("ColorFacialHair")
-local ColorHair = inventoryContainer:WaitForChild("ColorHair")
-local ColorRace = inventoryContainer:WaitForChild("ColorRace")
-
-registerFrame(Inventory1Pants)
-registerFrame(Inventory1Shirt)
-registerFrame(Inventory1Extra)
-registerFrame(Inventory1Mouth)
-registerFrame(Inventory2Eyes)
-registerFrame(Inventory2FacialHair)
-registerFrame(Inventory2Hair)
-registerFrame(Inventory2Race)
-registerFrame(ColorSkin)
-registerFrame(ColorEyes)
-registerFrame(ColorFacialHair)
-registerFrame(ColorHair)
-registerFrame(ColorRace)
-
-for frame in pairs(allFrames) do
-	frame.Visible = false
-end
-
-local currentOpenInventory = nil
-local currentEquipped = {}
-local colorPickers = {}
-
-function closeAllInventories()
-	for pal, picker in pairs(colorPickers) do
-		picker:Destroy()
-		colorPickers[pal] = nil
-	end
-	for frame in pairs(allFrames) do
-		frame.Visible = false
-	end
-	currentOpenInventory = nil
-	print("Все инвентари и палитры закрыты.")
-end
-
-local inventoryMapping = {
-	[Inventory1Extra] = "Extra",
-	[Inventory1Mouth] = "Mouth",
-	[Inventory1Pants] = "Pants",
-	[Inventory2Race]  = "Race",
-	[Inventory1Shirt] = "Shirt",
-	[Inventory2Eyes]  = "Eyes",
-	[Inventory2FacialHair] = "FacialHair",
-	[Inventory2Hair]  = "Hair",
-}
-
-local populatedInventories = {}
-
-local function populateInventory(inventoryFrame, categoryName)
-	local scrollingFrame = inventoryFrame:WaitForChild("ScrollingFrame")
-	for _, child in ipairs(scrollingFrame:GetChildren()) do
-		if child:GetAttribute("Item") == true then
-			child:Destroy()
-		end
-	end
-
-	local items = GetInventoryItems:InvokeServer(categoryName)
-	if not items then
-		warn("Не удалось загрузить инвентарь '" .. categoryName .. "'")
-		return
-	end
-
-	for _, itemData in ipairs(items) do
-		local itemClone = itemTemplate:Clone()
-		itemClone:SetAttribute("Item", true)
-		itemClone.Name = itemData.name .. "_Frame"
-		local button = itemClone:FindFirstChild("ImageButton")
-		if button then
-			button.Activated:Connect(function()
-				local equippedName = currentEquipped[categoryName]
-				if equippedName == itemData.name then
-					EquipItemEvent:FireServer(categoryName, nil)
-					print("Снятие: " .. itemData.name .. " из " .. categoryName)
-				else
-					EquipItemEvent:FireServer(categoryName, itemData.name)
-					print("Экипировка: " .. itemData.name .. " из " .. categoryName)
-				end
-			end)
-		end
-		itemClone.Parent = scrollingFrame
-	end
-	populatedInventories[inventoryFrame] = true
-end
-
-local currentCategoryColors = {
-	Eyes = Color3.new(1, 1, 1),
-	FacialHair = Color3.new(1, 1, 1),
-	Hair = Color3.new(1, 1, 1),
-	Race = Color3.new(1, 1, 1),
-	Skin = Color3.new(1, 1, 1),
-}
-
-local skinColorFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("Frame")
-skinColorFrame.BackgroundColor3 = currentCategoryColors.Skin
-
--- Запрашиваем у сервера сохранённый цвет кожи (если есть)
-local GetPlayerSkinColor = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
-local savedSkin = GetPlayerSkinColor:InvokeServer()
-if savedSkin then
-	currentCategoryColors.Skin = savedSkin
-	skinColorFrame.BackgroundColor3 = savedSkin
-	print("?? Начальный цвет кожи загружен:", savedSkin)
-else
-	print("?? Цвет кожи ещё не сохранён, используется дефолтный")
-end
-
-local function openColorPicker(palette, categoryName, parentInventory)
-	if currentOpenInventory == palette then
-		if colorPickers[palette] then
-			colorPickers[palette]:Destroy()
-			colorPickers[palette] = nil
-		end
-		palette.Visible = false
-		currentOpenInventory = nil
-		print("Палитра закрыта: " .. palette.Name)
-		return
-	end
-
-	for _, pal in ipairs({ColorEyes, ColorFacialHair, ColorHair, ColorSkin, ColorRace}) do
-		if pal.Visible and pal ~= palette then
-			if colorPickers[pal] then
-				colorPickers[pal]:Destroy()
-				colorPickers[pal] = nil
-			end
-			pal.Visible = false
-		end
-	end
-
-	if parentInventory then
-		parentInventory.Visible = true
-	end
-
-	palette.Visible = true
-	currentOpenInventory = palette
-
-	local initialColor = currentCategoryColors[categoryName] or Color3.new(1,1,1)
-
-	local function onColorChanged(newColor)
-		currentCategoryColors[categoryName] = newColor
-		ChangePartColorEvent:FireServer(categoryName, newColor)
-		print("Предпросмотр " .. categoryName .. ": " .. tostring(newColor))
-	end
-	
-	local function onClosed()
-		palette.Visible = false
-		if currentOpenInventory == palette then
-			currentOpenInventory = nil
-		end
-		if colorPickers[palette] == picker then
-			colorPickers[palette] = nil
-		end
-		if categoryName == "Skin" then
-			skinColorFrame.BackgroundColor3 = currentCategoryColors.Skin
-		end
-		print("Пикер закрыт: " .. categoryName)
-	end
-
-	local picker = ColorPickerModule.new(palette, initialColor, onColorChanged, onClosed)
-	colorPickers[palette] = picker
-end
-
-local function switchToMainInventory(targetFrame)
-	if currentOpenInventory == targetFrame then
-		closeAllInventories()
-		return
-	end
-
-	for pal, picker in pairs(colorPickers) do
-		picker:Destroy()
-		colorPickers[pal] = nil
-	end
-	for frame in pairs(allFrames) do
-		frame.Visible = false
-	end
-
-	targetFrame.Visible = true
-	currentOpenInventory = targetFrame
-	print("Открыт: " .. targetFrame.Name)
-
-	if not populatedInventories[targetFrame] and inventoryMapping[targetFrame] then
-		populateInventory(targetFrame, inventoryMapping[targetFrame])
+local function updateGenderButtons(selectedGender)
+	if selectedGender == "male" then
+		maleButton.BackgroundColor3 = ACTIVE_COLOR
+		femaleButton.BackgroundColor3 = FEMALE_INACTIVE_COLOR
+	elseif selectedGender == "female" then
+		maleButton.BackgroundColor3 = MALE_INACTIVE_COLOR
+		femaleButton.BackgroundColor3 = ACTIVE_COLOR
 	end
 end
 
--- Подключение кнопок интерфейса
-local function connectMainButton(guiPath, targetFrame)
-	local btn = playerGui
-	for _, child in ipairs(guiPath) do
-		btn = btn:WaitForChild(child)
-	end
-	btn.MouseButton1Click:Connect(function()
-		switchToMainInventory(targetFrame)
-	end)
+-- Первичная подсветка из StringValue
+if genderValue then
+	updateGenderButtons(genderValue.Value)
 end
 
-connectMainButton({"CreationMenuGui", "CustomizeLeft", "Frame", "Pants", "Frame", "Frame", "PantsButton"}, Inventory1Pants)
-connectMainButton({"CreationMenuGui", "CustomizeLeft", "Frame", "Race", "Frame", "Frame", "RaceButton"}, Inventory2Race)
-connectMainButton({"CreationMenuGui", "CustomizeLeft", "Frame", "Shirt", "Frame", "Frame", "ShirtButton"}, Inventory1Shirt)
-connectMainButton({"CreationMenuGui", "CustomizeRight", "Frame", "Extra", "Frame", "Frame", "ExtraButton"}, Inventory1Extra)
-connectMainButton({"CreationMenuGui", "CustomizeRight", "Frame", "Eyes", "Frame", "Frame", "EyesButton"}, Inventory2Eyes)
-connectMainButton({"CreationMenuGui", "CustomizeRight", "Frame", "FacialHair", "Frame", "Frame", "FacialHairButton"}, Inventory2FacialHair)
-connectMainButton({"CreationMenuGui", "CustomizeRight", "Frame", "Hair", "Frame", "Frame", "HairButton"}, Inventory2Hair)
-connectMainButton({"CreationMenuGui", "CustomizeRight", "Frame", "Mouth", "Frame", "Frame", "MouthButton"}, Inventory1Mouth)
+-- Слушаем изменения пола (если он меняется не только по кнопке, но и с сервера)
+genderValue.Changed:Connect(function(newValue)
+	updateGenderButtons(newValue)
+end)
 
--- SkinColorButton
-local skinColorButton = playerGui:WaitForChild("CreationMenuGui"):WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Frame"):WaitForChild("SkinColorButton")
-skinColorButton.MouseButton1Click:Connect(function()
-	if currentOpenInventory == ColorSkin then
-		if colorPickers[ColorSkin] then
-			colorPickers[ColorSkin]:Destroy()
-		else
-			ColorSkin.Visible = false
-			currentOpenInventory = nil
-		end
+-- Запрос смены пола на сервер
+local function applyGender(gender)
+	if gender == "male" or gender == "female" then
+		changeGenderEvent:FireServer(gender)
+		-- Мгновенно подсвечиваем кнопку для отзывчивости интерфейса
+		updateGenderButtons(gender)
+		print("Запрос на смену пола отправлен: " .. gender)
 	else
-		closeAllInventories()
-		openColorPicker(ColorSkin, "Skin", nil)
-	end
-end)
-
-local function connectColorButton(guiPath, colorPalette, parentInventory, categoryName)
-	local btn = playerGui
-	for _, child in ipairs(guiPath) do
-		btn = btn:WaitForChild(child)
-	end
-	btn.MouseButton1Click:Connect(function()
-		openColorPicker(colorPalette, categoryName, parentInventory)
-	end)
-end
-
-connectColorButton({"CreationMenuGui", "InventoryColor", "Inventory2Eyes", "Frame", "ColorButton"}, ColorEyes, Inventory2Eyes, "Eyes")
-connectColorButton({"CreationMenuGui", "InventoryColor", "Inventory2FacialHair", "Frame", "ColorButton"}, ColorFacialHair, Inventory2FacialHair, "FacialHair")
-connectColorButton({"CreationMenuGui", "InventoryColor", "Inventory2Hair", "Frame", "ColorButton"}, ColorHair, Inventory2Hair, "Hair")
-connectColorButton({"CreationMenuGui", "InventoryColor", "Inventory2Race", "Frame", "ColorButton"}, ColorRace, Inventory2Race, "Race")
-
--- ===================== РАНДОМАЙЗЕР =====================
-local randomButton = randomFrame:WaitForChild("Frame"):WaitForChild("RandomButton")
-
-local function randomColor()
-	return Color3.fromHSV(math.random(), 0.7 + math.random() * 0.3, 0.7 + math.random() * 0.3)
-end
-
-local categoryItemCache = {}
-
-local function preloadCategories()
-	-- ИСПРАВЛЕНО: добавлена "Race" для корректной работы рандомайзера
-	local cats = {"Shirt", "Pants", "Extra", "Eyes", "Hair", "FacialHair", "Mouth", "Race"}
-	for _, cat in ipairs(cats) do
-		categoryItemCache[cat] = GetInventoryItems:InvokeServer(cat)
+		warn("Неизвестный пол: " .. tostring(gender))
 	end
 end
-preloadCategories()
 
-randomButton.MouseButton1Click:Connect(function()
-	closeAllInventories()
-	local rng = Random.new()
+maleButton.MouseButton1Click:Connect(function() applyGender("male") end)
+femaleButton.MouseButton1Click:Connect(function() applyGender("female") end)
 
-	-- Обязательные категории (всегда новые предметы)
-	local required = {"Shirt", "Pants", "Eyes", "Mouth", "Race"}
-	for _, cat in ipairs(required) do
-		local items = categoryItemCache[cat]
-		if items and #items > 0 then
-			local chosen = items[rng:NextInteger(1, #items)]
-			EquipItemEvent:FireServer(cat, chosen.name)
-		end
-	end
+-- ===================== ПЕРЕХОДЫ =====================
 
-	-- Опциональные категории с вероятностями и возможностью снятия
-	local optional = {
-		{name = "Hair",       chance = 0.85},
-		{name = "FacialHair", chance = 0.20},
-		{name = "Extra",      chance = 0.20},
-	}
-	for _, opt in ipairs(optional) do
-		local items = categoryItemCache[opt.name]
-		if items and #items > 0 and rng:NextNumber() < opt.chance then
-			local chosen = items[rng:NextInteger(1, #items)]
-			EquipItemEvent:FireServer(opt.name, chosen.name)
-		else
-			EquipItemEvent:FireServer(opt.name, nil)
-		end
-	end
-
-	-- Применяем цвета
-	local colorable = {"Eyes", "Hair", "FacialHair", "Race"}
-	for _, cat in ipairs(colorable) do
-		local col = getPleasantColor()
-		currentCategoryColors[cat] = col
-		ChangePartColorEvent:FireServer(cat, col)
-	end
-
-	-- Цвет кожи отдельно (телесная палитра)
-	local skinCol = skinColors[rng:NextInteger(1, #skinColors)]
-	currentCategoryColors.Skin = skinCol
-	ChangePartColorEvent:FireServer("Skin", skinCol)
-	skinColorFrame.BackgroundColor3 = skinCol
-
-	print("?? Рандомайзер выполнен!")
-end)
-
--- ===================== ТЕКСТОВЫЕ МЕТКИ ЭКИПИРОВКИ =====================
-local equipTextLabels = {}
-do
-	local leftFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame")
-	local rightFrame = creationGui:WaitForChild("CustomizeRight"):WaitForChild("Frame")
-	equipTextLabels = {
-		Race = leftFrame:WaitForChild("Race"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextRace"),
-		Shirt = leftFrame:WaitForChild("Shirt"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextShirt"),
-		Pants = leftFrame:WaitForChild("Pants"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextPants"),
-		Eyes = rightFrame:WaitForChild("Eyes"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextEyes"),
-		Extra = rightFrame:WaitForChild("Extra"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextExtra"),
-		Mouth = rightFrame:WaitForChild("Mouth"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextMouth"),
-		FacialHair = rightFrame:WaitForChild("FacialHair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextFacialHair"),
-		Hair = rightFrame:WaitForChild("Hair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextHair"),
-	}
-end
-
-local function updateEquipText(category, itemName)
-	local label = equipTextLabels[category]
-	if not label then return end
-	label.Text = itemName or "..."
-end
-
-EquipItemEvent.OnClientEvent:Connect(function(data)
-	currentEquipped[data.category] = data.item
-	updateEquipText(data.category, data.item)
-end)
-
--- ===================== ВОЗВРАТ И ПЕРЕХОДЫ =====================
+-- Возврат из редактора в главное меню (кнопка Back)
 local function returnToMenu()
 	if isTransitioning then return end
-	closeAllInventories()
+	InventoryController.closeAll()
 	isTransitioning = true
 
 	TweenService:Create(mainContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = originalMainPos}):Play()
 
-	local hidePos = UDim2.new(0.5, 0, 1.2, 0)
-	local tweenBottom = TweenService:Create(buttonContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = hidePos})
-	tweenBottom:Play()
-	tweenBottom.Completed:Connect(function()
-		buttonContainer.Visible = false
-	end)
-
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(customizeLeft, tweenInfo, {Position = UDim2.new(-0.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(customizeRight, tweenInfo, {Position = UDim2.new(1.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(customizeText, tweenInfo, {Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
-	local lastTween = TweenService:Create(leftRight, tweenInfo, {Position = UDim2.new(0.5, 0, -0.1, 0)})
-	lastTween:Play()
-
-	local randomTween = TweenService:Create(randomFrame, tweenInfo, {Position = UDim2.new(1.1, 0, 0.15, 0)})
-	randomTween:Play()
-	randomTween.Completed:Connect(function()
-		randomFrame.Visible = false
-	end)
-	lastTween.Completed:Connect(function()
-		customizeLeft.Visible = false
-		customizeRight.Visible = false
-		customizeText.Visible = false
-		leftRight.Visible = false
+	SceneEffects.hideCreationUI(function()
 		isTransitioning = false
 	end)
 
-	TweenService:Create(bgLeft, tweenInfo, {Position = bgLeftOriginalPos}):Play()
-	TweenService:Create(bgRight, tweenInfo, {Position = bgRightOriginalPos}):Play()
-
-	local camera = workspace.CurrentCamera
-	if not camera then return end
-	local angleVal = Instance.new("NumberValue")
-	angleVal.Value = -math.pi/2
-	local tweenCam = TweenService:Create(angleVal, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Value = 0})
-	angleVal.Changed:Connect(function()
-		camera.CFrame = CFrame.new(cameraBasePos) * CFrame.Angles(0, angleVal.Value, 0)
-	end)
-	tweenCam.Completed:Connect(function() angleVal:Destroy() end)
-	tweenCam:Play()
+	-- Камера возвращается к прямому виду
+	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, 0, 1.0)
+	if not tweenCam then
+		isTransitioning = false
+	end
 end
 
+-- Переход из главного меню в редактор (слоты Slot1/Slot2)
 local function transitionToCreation()
 	if isTransitioning then return end
 	isTransitioning = true
@@ -524,438 +183,76 @@ local function transitionToCreation()
 	TweenService:Create(mainContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = targetPos}):Play()
 
-	buttonContainer.Visible = true
-	buttonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)
-	TweenService:Create(buttonContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
+	SceneEffects.showCreationUI()
 
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	customizeLeft.Position = UDim2.new(-0.1, 0, 0.5, 0)
-	customizeLeft.Visible = true
-	TweenService:Create(customizeLeft, tweenInfo, {Position = UDim2.new(0.25, 0, 0.5, 0)}):Play()
-
-	customizeRight.Position = UDim2.new(1.1, 0, 0.5, 0)
-	customizeRight.Visible = true
-	TweenService:Create(customizeRight, tweenInfo, {Position = UDim2.new(0.75, 0, 0.5, 0)}):Play()
-
-	customizeText.Position = UDim2.new(0.5, 0, -0.1, 0)
-	customizeText.Visible = true
-	TweenService:Create(customizeText, tweenInfo, {Position = UDim2.new(0.5, 0, 0.06, 0)}):Play()
-
-	leftRight.Position = UDim2.new(0.5, 0, -0.1, 0)
-	leftRight.Visible = true
-	TweenService:Create(leftRight, tweenInfo, {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
-
-	-- ? Анимация появления Random
-	randomFrame.Position = UDim2.new(1.1, 0, 0.15, 0)
-	randomFrame.Visible = true
-	TweenService:Create(randomFrame, tweenInfo, {Position = UDim2.new(0.711, 0, 0.15, 0)}):Play()
-
-	TweenService:Create(bgLeft, tweenInfo, {Position = UDim2.new(0.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(bgRight, tweenInfo, {Position = UDim2.new(0.9, 0, 0.5, 0)}):Play()
-
-	local camera = workspace.CurrentCamera
-	if not camera then return end
-	local angleVal = Instance.new("NumberValue")
-	angleVal.Value = 0
-	local tweenCam = TweenService:Create(angleVal, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Value = -math.pi/2})
-	angleVal.Changed:Connect(function()
-		camera.CFrame = CFrame.new(cameraBasePos) * CFrame.Angles(0, angleVal.Value, 0)
-	end)
+	-- Камера поворачивается ВЛЕВО на 90° (вид редактора)
+	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, 0, -math.pi/2, 1.0)
+	if not tweenCam then
+		isTransitioning = false
+		return
+	end
 	tweenCam.Completed:Connect(function()
-		angleVal:Destroy()
 		isTransitioning = false
 	end)
-	tweenCam:Play()
 end
 
-slot1.MouseButton1Click:Connect(transitionToCreation)
-slot2.MouseButton1Click:Connect(transitionToCreation)
-backBtn.MouseButton1Click:Connect(returnToMenu)
-nextBtn.MouseButton1Click:Connect(function()
-	print("Кнопка «Продолжить» нажата (пока без действия)")
-end)
-
--- ===================== СМЕНА ПОЛА =====================
-local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")
-
-local genderFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("Gender")
-if genderFrame then
-	local ACTIVE_COLOR = Color3.fromRGB(180, 180, 180)
-	local MALE_INACTIVE_COLOR = Color3.fromRGB(62, 127, 206)
-	local FEMALE_INACTIVE_COLOR = Color3.fromRGB(194, 124, 206)
-
-	local maleButton = genderFrame:WaitForChild("Frame"):WaitForChild("MaleButton")
-	local femaleButton = genderFrame:WaitForChild("Frame"):WaitForChild("FemaleButton")
-
-	local function updateGenderButtons(selectedGender)
-		if selectedGender == "male" then
-			maleButton.BackgroundColor3 = ACTIVE_COLOR
-			femaleButton.BackgroundColor3 = FEMALE_INACTIVE_COLOR
-		elseif selectedGender == "female" then
-			maleButton.BackgroundColor3 = MALE_INACTIVE_COLOR
-			femaleButton.BackgroundColor3 = ACTIVE_COLOR
-		end
-	end
-
-	-- Первичная подсветка из StringValue
-	local currentGender = getCurrentGender()
-	if currentGender then
-		updateGenderButtons(currentGender)
-	end
-
-	-- Слушаем изменения пола (если он меняется не только по кнопке, но и с сервера)
-	genderValue.Changed:Connect(function(newValue)
-		updateGenderButtons(newValue)
-	end)
-
-	-- Функция запроса смены пола
-	local function applyGender(gender)
-		if gender == "male" or gender == "female" then
-			changeGenderEvent:FireServer(gender)
-			-- Мгновенно подсвечиваем кнопку для отзывчивости интерфейса
-			updateGenderButtons(gender)
-			print("Запрос на смену пола отправлен: " .. gender)
-		else
-			warn("Неизвестный пол: " .. tostring(gender))
-		end
-	end
-
-	maleButton.MouseButton1Click:Connect(function() applyGender("male") end)
-	femaleButton.MouseButton1Click:Connect(function() applyGender("female") end)
-end
-
--- Функция для плавного ухода из редактора (Next Button)
+-- Переход из редактора в меню стихий (кнопка Next)
 local function transitionFromCreation()
 	if isTransitioning then return end
 	isTransitioning = true
 
 	-- Закрываем инвентари и палитры
-	closeAllInventories()
+	InventoryController.closeAll()
 
 	-- ===== Скрываем CreationMenuGui (аналогично кнопке Back) =====
-	local hidePos = UDim2.new(0.5, 0, 1.2, 0)
-	local tweenBottom = TweenService:Create(buttonContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = hidePos})
-	tweenBottom:Play()
-	tweenBottom.Completed:Connect(function()
-		buttonContainer.Visible = false
-	end)
-
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-	TweenService:Create(customizeLeft, tweenInfo, {Position = UDim2.new(-0.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(customizeRight, tweenInfo, {Position = UDim2.new(1.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(customizeText, tweenInfo, {Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
-
-	local randomTween = TweenService:Create(randomFrame, tweenInfo, {Position = UDim2.new(1.1, 0, 0.15, 0)})
-	randomTween:Play()
-	randomTween.Completed:Connect(function()
-		randomFrame.Visible = false
-	end)
-
-	local lastTween = TweenService:Create(leftRight, tweenInfo, {Position = UDim2.new(0.5, 0, -0.1, 0)})
-	lastTween:Play()
-	lastTween.Completed:Connect(function()
-		customizeLeft.Visible = false
-		customizeRight.Visible = false
-		customizeText.Visible = false
-		leftRight.Visible = false
-		-- isTransitioning больше не ставим здесь, дождёмся окончания анимации камеры!
-	end)
-
-	TweenService:Create(bgLeft, tweenInfo, {Position = bgLeftOriginalPos}):Play()
-	TweenService:Create(bgRight, tweenInfo, {Position = bgRightOriginalPos}):Play()
+	SceneEffects.hideCreationUI()
 
 	-- ===== Появление ElementMenuGui =====
-	elementMenu.Enabled = true  -- Включаем весь GUI, если он был выключен
+	SceneEffects.showElementMenu()
 
-	-- ButtonContainer: появляется снизу так же, как CreationMenuGui.ButtonContainer
-	elementButtonContainer.Visible = true
-	elementButtonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)  -- старт снизу
-	TweenService:Create(elementButtonContainer, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
-
-	-- BackFrameUp: сверху вниз
-	elementBackFrameUp.Visible = true
-	elementBackFrameUp.Position = UDim2.new(0.5, 0, -0.2, 0)
-	TweenService:Create(elementBackFrameUp, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0.8, 0)}):Play()
-
-	-- BackFrameDown: снизу вверх
-	elementBackFrameDown.Visible = true
-	elementBackFrameDown.Position = UDim2.new(0.5, 0, 1.1, 0)
-	TweenService:Create(elementBackFrameDown, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0, 0)}):Play()
-
-	-- BackFrame: слева направо (конечная позиция как в запросе – справа за экраном)
-	-- Если нужно, чтобы он останавливался в видимой области, замените конечный X на 0.5
-	elementBackFrame.Visible = true
-	elementBackFrame.Position = UDim2.new(-0.1, 0, 0.4, 0)
-	TweenService:Create(elementBackFrame, tweenInfo,
-		{Position = UDim2.new(1, 0, 0.4, 0)}):Play()
-
-	-- ===== Анимация камеры: поворот ВПРАВО на 90° =====
-	local camera = workspace.CurrentCamera
-	if not camera then
+	-- ===== Анимация камеры: поворот ВПРАВО на 90° (от -pi/2 к -pi) =====
+	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, -math.pi, 1.0)
+	if not tweenCam then
 		isTransitioning = false
 		return
 	end
-
-	local angleVal = Instance.new("NumberValue")
-	angleVal.Value = -math.pi/2            -- текущий угол в редакторе (смотрит влево)
-	local targetAngle = -math.pi           -- поворот вправо на 90° (-?/2 > -?)
-
-	local tweenCam = TweenService:Create(angleVal, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Value = targetAngle})
-	angleVal.Changed:Connect(function()
-		camera.CFrame = CFrame.new(cameraBasePos) * CFrame.Angles(0, angleVal.Value, 0)
-	end)
 	tweenCam.Completed:Connect(function()
-		angleVal:Destroy()
 		isTransitioning = false   -- разблокируем только после полного завершения камеры
 	end)
-	tweenCam:Play()
-	
+
 	-- Появление YourChoiceFrame
-	yourChoiceFrame.Visible = true
-	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)  -- начинаем снизу
-	local yourChoiceTween = TweenService:Create(yourChoiceFrame,
-		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = UDim2.new(0.5, 0, 0.9, 0)})
-	yourChoiceTween:Play()
+	SceneEffects.showYourChoiceFrame()
 end
 
--- Замените старую заглушку NextButton:
-nextBtn.MouseButton1Click:Connect(transitionFromCreation)
-
--- ===================== ИНФО-ФРЕЙМЫ СТИХИЙ =====================
-local infoFrameContainer = elementMenu:WaitForChild("InfoFrame")
-local airInfoFrame   = infoFrameContainer:WaitForChild("AirInfoFrame")
-local earthInfoFrame = infoFrameContainer:WaitForChild("EarthInfoFrame")
-local lightInfoFrame = infoFrameContainer:WaitForChild("LightInfoFrame")
-local gloomInfoFrame = infoFrameContainer:WaitForChild("GloomInfoFrame")
-local waterInfoFrame = infoFrameContainer:WaitForChild("WaterInfoFrame")
-local fireInfoFrame  = infoFrameContainer:WaitForChild("FireInfoFrame")
-
--- Рекурсивный поиск кнопки по имени внутри elementMenu
-local function findButton(parent, name)
-	for _, child in ipairs(parent:GetChildren()) do
-		if child.Name == name and child:IsA("GuiButton") then
-			return child
-		end
-		local found = findButton(child, name)
-		if found then return found end
-	end
-	return nil
-end
-
--- Ищем кнопки (уже после загрузки ElementMenuGui)
-local fireButton  = findButton(elementMenu, "FireButton")
-local airButton   = findButton(elementMenu, "AirButton")
-local lightButton = findButton(elementMenu, "LightButton")
-local waterButton = findButton(elementMenu, "WaterButton")
-local earthButton = findButton(elementMenu, "EarthButton")
-local gloomButton = findButton(elementMenu, "GloomButton")
-
--- Проверка, что все кнопки найдены
-local names = {"FireButton", "AirButton", "LightButton", "WaterButton", "EarthButton", "GloomButton"}
-local buttons = {fireButton, airButton, lightButton, waterButton, earthButton, gloomButton}
-for i, btn in ipairs(buttons) do
-	if not btn then
-		warn("Кнопка " .. names[i] .. " не найдена в ElementMenuGui!")
-	end
-end
-
--- Позиции анимации
-local INFO_HIDE_POS = UDim2.new(1.1, 0, 0.4, 0)
-local INFO_SHOW_POS = UDim2.new(0.6, 0, 0.4, 0)
-
--- Скрываем все инфо-фреймы изначально
-for _, frame in ipairs({airInfoFrame, earthInfoFrame, lightInfoFrame, gloomInfoFrame, waterInfoFrame, fireInfoFrame}) do
-	frame.Visible = false
-	frame.Position = INFO_HIDE_POS
-end
-
-local currentInfoFrame = nil   -- какой фрейм открыт сейчас
-local isInfoAnimating = false
-
--- Вспомогательные функции анимации
-local function closeInfoFrame(infoFrame, callback)
-	local tween = TweenService:Create(infoFrame,
-		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = INFO_HIDE_POS})
-	tween:Play()
-	tween.Completed:Connect(function()
-		infoFrame.Visible = false
-		if callback then callback() end
-	end)
-end
-
-local function showInfoFrame(infoFrame, callback)
-	infoFrame.Visible = true
-	infoFrame.Position = INFO_HIDE_POS
-	local tween = TweenService:Create(infoFrame,
-		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = INFO_SHOW_POS})
-	tween:Play()
-	if callback then
-		tween.Completed:Connect(callback)
-	end
-end
-
--- Обработчик нажатия на кнопку стихии
-local function onElementButtonClicked(infoFrame)
-	if isInfoAnimating then return end
-
-	if currentInfoFrame == infoFrame then
-		isInfoAnimating = true
-		closeInfoFrame(infoFrame, function()
-			currentInfoFrame = nil
-			isInfoAnimating = false
-		end)
-	else
-		isInfoAnimating = true
-		local previous = currentInfoFrame
-		local function openNew()
-			showInfoFrame(infoFrame, function()
-				currentInfoFrame = infoFrame
-				isInfoAnimating = false
-			end)
-		end
-		if previous then
-			closeInfoFrame(previous, openNew)
-		else
-			openNew()
-		end
-	end
-end
-
--- Подключаем кнопки стихий
-if fireButton then fireButton.MouseButton1Click:Connect(function() onElementButtonClicked(fireInfoFrame) end) end
-if waterButton then waterButton.MouseButton1Click:Connect(function() onElementButtonClicked(waterInfoFrame) end) end
-if airButton then airButton.MouseButton1Click:Connect(function() onElementButtonClicked(airInfoFrame) end) end
-if earthButton then earthButton.MouseButton1Click:Connect(function() onElementButtonClicked(earthInfoFrame) end) end
-if lightButton then lightButton.MouseButton1Click:Connect(function() onElementButtonClicked(lightInfoFrame) end) end
-if gloomButton then gloomButton.MouseButton1Click:Connect(function() onElementButtonClicked(gloomInfoFrame) end) end
-
--- ===================== ОБРАТНЫЙ ПЕРЕХОД: ElementMenu > CreationMenu =====================
+-- Обратный переход: ElementMenu > CreationMenu (кнопка Back в меню стихий)
 local function transitionBackToCreation()
 	if isTransitioning then return end
 	isTransitioning = true
 
 	-- Закрываем все открытые инвентари (на всякий случай)
-	closeAllInventories()
-	
+	InventoryController.closeAll()
+
 	local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
 	resetChoiceEvent:Fire()
 
 	-- === Плавно убираем открытый инфо-фрейм стихии (если есть) ===
-	if currentInfoFrame then
-		local frameToClose = currentInfoFrame
-		currentInfoFrame = nil                -- сбрасываем ссылку сразу
-		local closeTween = TweenService:Create(frameToClose,
-			TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{Position = INFO_HIDE_POS})
-		closeTween:Play()
-		closeTween.Completed:Connect(function()
-			frameToClose.Visible = false
-		end)
-	end
+	ElementMenu.closeOpenInfoFrame(0.5, true)
 
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-	-- Убираем ElementMenuGui
-	local btnContainerTween = TweenService:Create(elementButtonContainer,
-		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = UDim2.new(0.5, 0, 1.2, 0)})
-	btnContainerTween:Play()
-	btnContainerTween.Completed:Connect(function()
-		elementButtonContainer.Visible = false
-	end)
-
-	TweenService:Create(elementBackFrameUp, tweenInfo,
-		{Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
-	TweenService:Create(elementBackFrameDown, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 1.1, 0)}):Play()
-	local backFrameTween = TweenService:Create(elementBackFrame, tweenInfo,
-		{Position = UDim2.new(-0.1, 0, 0.4, 0)})
-	backFrameTween:Play()
-	backFrameTween.Completed:Connect(function()
-		elementBackFrame.Visible = false
-		elementMenu.Enabled = false
-		isTransitioning = false
-	end)
-
-	-- Возвращаем CreationMenuGui
-	buttonContainer.Visible = true
-	buttonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)
-	TweenService:Create(buttonContainer, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
-
-	customizeLeft.Position = UDim2.new(-0.1, 0, 0.5, 0)
-	customizeLeft.Visible = true
-	TweenService:Create(customizeLeft, tweenInfo,
-		{Position = UDim2.new(0.25, 0, 0.5, 0)}):Play()
-
-	customizeRight.Position = UDim2.new(1.1, 0, 0.5, 0)
-	customizeRight.Visible = true
-	TweenService:Create(customizeRight, tweenInfo,
-		{Position = UDim2.new(0.75, 0, 0.5, 0)}):Play()
-
-	customizeText.Position = UDim2.new(0.5, 0, -0.1, 0)
-	customizeText.Visible = true
-	TweenService:Create(customizeText, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0.06, 0)}):Play()
-
-	leftRight.Position = UDim2.new(0.5, 0, -0.1, 0)
-	leftRight.Visible = true
-	TweenService:Create(leftRight, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
-
-	randomFrame.Position = UDim2.new(1.1, 0, 0.15, 0)
-	randomFrame.Visible = true
-	TweenService:Create(randomFrame, tweenInfo,
-		{Position = UDim2.new(0.711, 0, 0.15, 0)}):Play()
-
-	TweenService:Create(bgLeft, tweenInfo,
-		{Position = UDim2.new(0.1, 0, 0.5, 0)}):Play()
-	TweenService:Create(bgRight, tweenInfo,
-		{Position = UDim2.new(0.9, 0, 0.5, 0)}):Play()
+	-- === Убираем ElementMenuGui и возвращаем редактор ===
+	SceneEffects.hideElementMenu({
+		onHidden = function()
+			isTransitioning = false
+		end,
+		yourChoice = "hide",
+	})
+	SceneEffects.showCreationUI()
 
 	-- Камера назад в редактор
-	local camera = workspace.CurrentCamera
-	if camera then
-		local angleVal = Instance.new("NumberValue")
-		angleVal.Value = -math.pi
-		local targetAngle = -math.pi/2
-		local tweenCam = TweenService:Create(angleVal, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{Value = targetAngle})
-		angleVal.Changed:Connect(function()
-			camera.CFrame = CFrame.new(cameraBasePos) * CFrame.Angles(0, angleVal.Value, 0)
-		end)
-		tweenCam:Play()
-		tweenCam.Completed:Connect(function()
-			angleVal:Destroy()
-		end)
-	else
+	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi, -math.pi/2, 1.0)
+	if not tweenCam then
 		isTransitioning = false
 	end
-	
-	local hideYourChoiceTween = TweenService:Create(yourChoiceFrame,
-		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{Position = UDim2.new(0.5, 0, 1.1, 0)})
-	hideYourChoiceTween:Play()
-	hideYourChoiceTween.Completed:Connect(function()
-		yourChoiceFrame.Visible = false
-	end)
 end
-
--- Подключаем кнопку Back в ElementMenuGui
-elementBackButton.MouseButton1Click:Connect(transitionBackToCreation)
-
--- ===================== ФИНАЛЬНЫЙ ПЕРЕХОД (Play) ====================
 
 -- Финальный переход из меню стихий (выбор сделан)
 local function transitionToFinal(chosenElement)
@@ -963,38 +260,16 @@ local function transitionToFinal(chosenElement)
 	isTransitioning = true
 
 	-- Закрываем все инвентари/палитры
-	closeAllInventories()
+	InventoryController.closeAll()
 
 	-- === Скрываем ElementMenuGui ===
+	SceneEffects.hideElementMenu({ yourChoice = "slide" })
+
+	-- Убираем открытый инфо-фрейм, если остался
+	ElementMenu.closeOpenInfoFrame(0.5, false)
+
+	-- === Фоновые панели MainMenuGui разлетаются в стороны ===
 	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-	TweenService:Create(elementButtonContainer, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 1.2, 0)}):Play()
-
-	TweenService:Create(elementBackFrameUp, tweenInfo,
-		{Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
-	TweenService:Create(elementBackFrameDown, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 1.1, 0)}):Play()
-	local backFrameTween = TweenService:Create(elementBackFrame, tweenInfo,
-		{Position = UDim2.new(-0.1, 0, 0.4, 0)})
-	backFrameTween:Play()
-	backFrameTween.Completed:Connect(function()
-		elementBackFrame.Visible = false
-		elementMenu.Enabled = false
-	end)
-
-	TweenService:Create(yourChoiceFrame, tweenInfo,
-		{Position = UDim2.new(0.5, 0, 1.1, 0)}):Play()
-
-	if currentInfoFrame then
-		local frameToClose = currentInfoFrame
-		currentInfoFrame = nil
-		TweenService:Create(frameToClose,
-			TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{Position = INFO_HIDE_POS}):Play()
-	end
-
-	-- === Фоновые панели MainMenuGui ===
 	TweenService:Create(bgLeft, tweenInfo,
 		{Position = UDim2.new(-2, 0, 0.5, 0)}):Play()
 	TweenService:Create(bgRight, tweenInfo,
@@ -1074,14 +349,23 @@ local function transitionToFinal(chosenElement)
 			isTransitioning = false
 			print("Финальный переход завершён. Элемент:", chosenElement)
 		end)
-		
+
 		task.wait(0.5) -- Небольшая пауза после анимации
 
 		-- Отправляем запрос на сервер вместе с выбором игрока
 		local requestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport")
-		requestTeleport:FireServer(chosenElement) -- chosenElement - это имя выбранной стихии
+		requestTeleport:FireServer(chosenElement) -- chosenElement - имя выбранной стихии
 	end)
 end
+
+-- ===================== ПОДКЛЮЧЕНИЕ КНОПОК И СОБЫТИЙ =====================
+slot1.MouseButton1Click:Connect(transitionToCreation)
+slot2.MouseButton1Click:Connect(transitionToCreation)
+backBtn.MouseButton1Click:Connect(returnToMenu)
+nextBtn.MouseButton1Click:Connect(transitionFromCreation)
+
+-- Кнопка Back в меню стихий
+elementBackButton.MouseButton1Click:Connect(transitionBackToCreation)
 
 ElementChosenEvent.Event:Connect(function(elementName)
 	print("Выбрана стихия:", elementName, "– выполняю финальный переход.")

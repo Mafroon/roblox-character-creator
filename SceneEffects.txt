@@ -1,0 +1,236 @@
+--[[
+	SceneEffects - клиентский модуль эффектов переходов.
+	ModuleScript: поместить в ReplicatedStorage с именем "SceneEffects".
+	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+
+	Общие анимации: поворот камеры, показ/скрытие редактора персонажа,
+	меню стихий и YourChoiceFrame. Функции твинов возвращают последний
+	запущенный Tween, если вызывающему нужен его Completed.
+]]
+
+local TweenService = game:GetService("TweenService")
+
+local SceneEffects = {}
+
+-- Единый стиль анимаций панелей (0.8 сек)
+local TWEEN_INFO = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Ссылки на интерфейс, заполняются в init()
+local ui = {}
+
+-- init(deps): deps = {
+--   buttonContainer, customizeLeft, customizeRight, customizeText,
+--   leftRight, randomFrame                - панели редактора (CreationMenuGui)
+--   elementMenu, elementButtonContainer,
+--   elementBackFrameUp, elementBackFrameDown, elementBackFrame,
+--   yourChoiceFrame                       - панели меню стихий (ElementMenuGui)
+--   bgLeft, bgRight,                      - фоновые панели (MainMenuGui)
+--   bgLeftOriginalPos, bgRightOriginalPos - их исходные позиции
+-- }
+function SceneEffects.init(deps)
+	ui = deps
+end
+
+-- ===================== РЕДАКТОР ПЕРСОНАЖА =====================
+
+-- Показ редактора персонажа (из главного меню или из меню стихий)
+function SceneEffects.showCreationUI()
+	local buttonContainer = ui.buttonContainer
+	buttonContainer.Visible = true
+	buttonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)
+	TweenService:Create(buttonContainer, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
+
+	local customizeLeft = ui.customizeLeft
+	customizeLeft.Position = UDim2.new(-0.1, 0, 0.5, 0)
+	customizeLeft.Visible = true
+	TweenService:Create(customizeLeft, TWEEN_INFO,
+		{Position = UDim2.new(0.25, 0, 0.5, 0)}):Play()
+
+	local customizeRight = ui.customizeRight
+	customizeRight.Position = UDim2.new(1.1, 0, 0.5, 0)
+	customizeRight.Visible = true
+	TweenService:Create(customizeRight, TWEEN_INFO,
+		{Position = UDim2.new(0.75, 0, 0.5, 0)}):Play()
+
+	local customizeText = ui.customizeText
+	customizeText.Position = UDim2.new(0.5, 0, -0.1, 0)
+	customizeText.Visible = true
+	TweenService:Create(customizeText, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.06, 0)}):Play()
+
+	local leftRight = ui.leftRight
+	leftRight.Position = UDim2.new(0.5, 0, -0.1, 0)
+	leftRight.Visible = true
+	TweenService:Create(leftRight, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+
+	-- Анимация появления Random
+	local randomFrame = ui.randomFrame
+	randomFrame.Position = UDim2.new(1.1, 0, 0.15, 0)
+	randomFrame.Visible = true
+	TweenService:Create(randomFrame, TWEEN_INFO,
+		{Position = UDim2.new(0.711, 0, 0.15, 0)}):Play()
+
+	TweenService:Create(ui.bgLeft, TWEEN_INFO,
+		{Position = UDim2.new(0.1, 0, 0.5, 0)}):Play()
+	TweenService:Create(ui.bgRight, TWEEN_INFO,
+		{Position = UDim2.new(0.9, 0, 0.5, 0)}):Play()
+end
+
+-- Скрытие редактора персонажа (в главное меню или в меню стихий).
+-- onHidden вызывается, когда уехала последняя панель (leftRight).
+function SceneEffects.hideCreationUI(onHidden)
+	local buttonContainer = ui.buttonContainer
+	local tweenBottom = TweenService:Create(buttonContainer, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 1.2, 0)})
+	tweenBottom:Play()
+	tweenBottom.Completed:Connect(function()
+		buttonContainer.Visible = false
+	end)
+
+	TweenService:Create(ui.customizeLeft, TWEEN_INFO,
+		{Position = UDim2.new(-0.1, 0, 0.5, 0)}):Play()
+	TweenService:Create(ui.customizeRight, TWEEN_INFO,
+		{Position = UDim2.new(1.1, 0, 0.5, 0)}):Play()
+	TweenService:Create(ui.customizeText, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
+
+	local randomTween = TweenService:Create(ui.randomFrame, TWEEN_INFO,
+		{Position = UDim2.new(1.1, 0, 0.15, 0)})
+	randomTween:Play()
+	randomTween.Completed:Connect(function()
+		ui.randomFrame.Visible = false
+	end)
+
+	local lastTween = TweenService:Create(ui.leftRight, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, -0.1, 0)})
+	lastTween:Play()
+	lastTween.Completed:Connect(function()
+		ui.customizeLeft.Visible = false
+		ui.customizeRight.Visible = false
+		ui.customizeText.Visible = false
+		ui.leftRight.Visible = false
+		if onHidden then onHidden() end
+	end)
+
+	TweenService:Create(ui.bgLeft, TWEEN_INFO,
+		{Position = ui.bgLeftOriginalPos}):Play()
+	TweenService:Create(ui.bgRight, TWEEN_INFO,
+		{Position = ui.bgRightOriginalPos}):Play()
+end
+
+-- ===================== МЕНЮ СТИХИЙ =====================
+
+-- Появление меню стихий (панели навигации)
+function SceneEffects.showElementMenu()
+	local elementMenu = ui.elementMenu
+	elementMenu.Enabled = true  -- Включаем весь GUI, если он был выключен
+
+	-- ButtonContainer: появляется снизу так же, как CreationMenuGui.ButtonContainer
+	local elementButtonContainer = ui.elementButtonContainer
+	elementButtonContainer.Visible = true
+	elementButtonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)  -- старт снизу
+	TweenService:Create(elementButtonContainer, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
+
+	-- BackFrameUp: сверху вниз
+	local backFrameUp = ui.elementBackFrameUp
+	backFrameUp.Visible = true
+	backFrameUp.Position = UDim2.new(0.5, 0, -0.2, 0)
+	TweenService:Create(backFrameUp, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.8, 0)}):Play()
+
+	-- BackFrameDown: снизу вверх
+	local backFrameDown = ui.elementBackFrameDown
+	backFrameDown.Visible = true
+	backFrameDown.Position = UDim2.new(0.5, 0, 1.1, 0)
+	TweenService:Create(backFrameDown, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0, 0)}):Play()
+
+	-- BackFrame: слева направо (конечная позиция - справа за экраном)
+	-- Если нужно, чтобы он останавливался в видимой области, замените конечный X на 0.5
+	local backFrame = ui.elementBackFrame
+	backFrame.Visible = true
+	backFrame.Position = UDim2.new(-0.1, 0, 0.4, 0)
+	TweenService:Create(backFrame, TWEEN_INFO,
+		{Position = UDim2.new(1, 0, 0.4, 0)}):Play()
+end
+
+-- Скрытие меню стихий.
+-- opts.onHidden - вызывается в Completed backFrame (после скрытия панелей)
+-- opts.yourChoice - что делать с YourChoiceFrame:
+--   "hide"  - увезти вниз и спрятать после анимации (выход назад)
+--   "slide" - только увезти вниз (финальный переход)
+function SceneEffects.hideElementMenu(opts)
+	opts = opts or {}
+
+	local elementButtonContainer = ui.elementButtonContainer
+	local btnContainerTween = TweenService:Create(elementButtonContainer, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 1.2, 0)})
+	btnContainerTween:Play()
+	btnContainerTween.Completed:Connect(function()
+		elementButtonContainer.Visible = false
+	end)
+
+	TweenService:Create(ui.elementBackFrameUp, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, -0.1, 0)}):Play()
+	TweenService:Create(ui.elementBackFrameDown, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 1.1, 0)}):Play()
+
+	local backFrameTween = TweenService:Create(ui.elementBackFrame, TWEEN_INFO,
+		{Position = UDim2.new(-0.1, 0, 0.4, 0)})
+	backFrameTween:Play()
+	backFrameTween.Completed:Connect(function()
+		ui.elementBackFrame.Visible = false
+		ui.elementMenu.Enabled = false
+		if opts.onHidden then opts.onHidden() end
+	end)
+
+	if opts.yourChoice then
+		local yourChoiceTween = TweenService:Create(ui.yourChoiceFrame, TWEEN_INFO,
+			{Position = UDim2.new(0.5, 0, 1.1, 0)})
+		yourChoiceTween:Play()
+		if opts.yourChoice == "hide" then
+			yourChoiceTween.Completed:Connect(function()
+				ui.yourChoiceFrame.Visible = false
+			end)
+		end
+	end
+end
+
+-- Появление YourChoiceFrame снизу
+function SceneEffects.showYourChoiceFrame()
+	local yourChoiceFrame = ui.yourChoiceFrame
+	yourChoiceFrame.Visible = true
+	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)  -- начинаем снизу
+	TweenService:Create(yourChoiceFrame, TWEEN_INFO,
+		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
+end
+
+-- ===================== КАМЕРА =====================
+
+-- Плавный поворот камеры вокруг вертикальной оси через NumberValue.
+-- Возвращает запущенный Tween или nil, если CurrentCamera отсутствует.
+function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+
+	local angleVal = Instance.new("NumberValue")
+	angleVal.Value = fromAngle
+	local tweenCam = TweenService:Create(angleVal,
+		TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{Value = toAngle})
+	angleVal.Changed:Connect(function()
+		camera.CFrame = CFrame.new(basePos) * CFrame.Angles(0, angleVal.Value, 0)
+	end)
+	tweenCam.Completed:Connect(function()
+		angleVal:Destroy()
+	end)
+	tweenCam:Play()
+	return tweenCam
+end
+
+return SceneEffects

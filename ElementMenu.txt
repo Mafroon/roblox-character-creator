@@ -1,0 +1,148 @@
+--[[
+	ElementMenu - клиентский модуль инфо-фреймов стихий.
+	ModuleScript: поместить в ReplicatedStorage с именем "ElementMenu".
+	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+
+	Отвечает за информационные фреймы стихий (Fire, Water, Earth, Air,
+	Light, Gloom) в ElementMenuGui: показ/скрытие по клику на кнопку
+	стихии и принудительное закрытие при переходах.
+]]
+
+local TweenService = game:GetService("TweenService")
+
+local ElementMenu = {}
+
+-- Позиции анимации инфо-фреймов
+local INFO_HIDE_POS = UDim2.new(1.1, 0, 0.4, 0)
+local INFO_SHOW_POS = UDim2.new(0.6, 0, 0.4, 0)
+
+-- Список стихий: имена фрейма в InfoFrame и кнопки в ElementMenuGui
+local ELEMENTS = {
+	{ infoFrame = "FireInfoFrame",  button = "FireButton" },
+	{ infoFrame = "WaterInfoFrame", button = "WaterButton" },
+	{ infoFrame = "EarthInfoFrame", button = "EarthButton" },
+	{ infoFrame = "AirInfoFrame",   button = "AirButton" },
+	{ infoFrame = "LightInfoFrame", button = "LightButton" },
+	{ infoFrame = "GloomInfoFrame", button = "GloomButton" },
+}
+
+local currentInfoFrame = nil    -- какой фрейм открыт сейчас
+local isInfoAnimating = false
+
+-- ===================== АНИМАЦИЯ ИНФО-ФРЕЙМОВ =====================
+local function closeInfoFrame(infoFrame, callback)
+	local tween = TweenService:Create(infoFrame,
+		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{Position = INFO_HIDE_POS})
+	tween:Play()
+	tween.Completed:Connect(function()
+		infoFrame.Visible = false
+		if callback then callback() end
+	end)
+end
+
+local function showInfoFrame(infoFrame, callback)
+	infoFrame.Visible = true
+	infoFrame.Position = INFO_HIDE_POS
+	local tween = TweenService:Create(infoFrame,
+		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{Position = INFO_SHOW_POS})
+	tween:Play()
+	if callback then
+		tween.Completed:Connect(callback)
+	end
+end
+
+-- Обработчик нажатия на кнопку стихии (открыть/закрыть/переключить)
+local function onElementButtonClicked(infoFrame)
+	if isInfoAnimating then return end
+
+	if currentInfoFrame == infoFrame then
+		isInfoAnimating = true
+		closeInfoFrame(infoFrame, function()
+			currentInfoFrame = nil
+			isInfoAnimating = false
+		end)
+	else
+		isInfoAnimating = true
+		local previous = currentInfoFrame
+		local function openNew()
+			showInfoFrame(infoFrame, function()
+				currentInfoFrame = infoFrame
+				isInfoAnimating = false
+			end)
+		end
+		if previous then
+			closeInfoFrame(previous, openNew)
+		else
+			openNew()
+		end
+	end
+end
+
+-- ===================== ИНИЦИАЛИЗАЦИЯ =====================
+-- init(deps): deps = {
+--   elementMenu     = ElementMenuGui,
+--   yourChoiceFrame = элемент YourChoiceFrame (изначально прячется),
+-- }
+function ElementMenu.init(deps)
+	local elementMenu = deps.elementMenu
+
+	-- YourChoiceFrame изначально спрятан снизу
+	local yourChoiceFrame = deps.yourChoiceFrame
+	yourChoiceFrame.Visible = false
+	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)
+
+	local infoFrameContainer = elementMenu:WaitForChild("InfoFrame")
+
+	-- Рекурсивный поиск кнопки по имени внутри elementMenu
+	local function findButton(parent, name)
+		for _, child in ipairs(parent:GetChildren()) do
+			if child.Name == name and child:IsA("GuiButton") then
+				return child
+			end
+			local found = findButton(child, name)
+			if found then return found end
+		end
+		return nil
+	end
+
+	-- Скрываем все инфо-фреймы и подключаем кнопки стихий
+	for _, element in ipairs(ELEMENTS) do
+		local infoFrame = infoFrameContainer:WaitForChild(element.infoFrame)
+		infoFrame.Visible = false
+		infoFrame.Position = INFO_HIDE_POS
+
+		local button = findButton(elementMenu, element.button)
+		if not button then
+			warn("Кнопка " .. element.button .. " не найдена в ElementMenuGui!")
+		else
+			button.MouseButton1Click:Connect(function()
+				onElementButtonClicked(infoFrame)
+			end)
+		end
+	end
+end
+
+-- Принудительно убрать открытый инфо-фрейм (если есть). Вызывается при переходах.
+-- duration - длительность анимации, hideOnComplete - скрыть фрейм после анимации.
+-- Возвращает запущенный Tween или nil, если открытого фрейма не было.
+function ElementMenu.closeOpenInfoFrame(duration, hideOnComplete)
+	if not currentInfoFrame then
+		return nil
+	end
+	local frameToClose = currentInfoFrame
+	currentInfoFrame = nil                -- сбрасываем ссылку сразу
+	local closeTween = TweenService:Create(frameToClose,
+		TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{Position = INFO_HIDE_POS})
+	closeTween:Play()
+	if hideOnComplete then
+		closeTween.Completed:Connect(function()
+			frameToClose.Visible = false
+		end)
+	end
+	return closeTween
+end
+
+return ElementMenu
