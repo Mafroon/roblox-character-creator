@@ -1,0 +1,75 @@
+-- Кастомный спавн персонажа (ServerScriptService)
+local ServerStorage = game:GetService("ServerStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+Players.CharacterAutoLoads = false
+
+-- Папки с готовыми моделями полов
+local genderFolder = ServerStorage:WaitForChild("Gender")
+local maleRig = genderFolder:WaitForChild("Male")
+local femaleRig = genderFolder:WaitForChild("Female")
+
+local spawnPosition = Vector3.new(10, 0, 0)
+local spawnRotation = CFrame.Angles(0, math.rad(90), 0)
+
+local idleAnimation = ServerStorage:FindFirstChild("Animations") and ServerStorage.Animations:FindFirstChild("Idle")
+
+local rng = Random.new()
+
+Players.PlayerAdded:Connect(function(player)
+	-- 50% шанс получить мужской или женский риг
+	local chosenGender = if rng:NextNumber() < 0.5 then "male" else "female"
+	local rigTemplate = if chosenGender == "male" then maleRig else femaleRig
+
+	local rig = rigTemplate:Clone()
+	rig.Name = player.Name .. "_CustomAvatar"
+	rig.Parent = workspace
+
+	-- Позиционируем риг
+	local rootPart = rig:FindFirstChild("HumanoidRootPart") or rig.PrimaryPart
+	if rootPart then
+		rootPart.Anchored = true
+		rig:PivotTo(CFrame.new(spawnPosition) * spawnRotation)
+	else
+		warn("Риг не имеет HumanoidRootPart или PrimaryPart – пропускаем позиционирование")
+		rig:PivotTo(CFrame.new(spawnPosition) * spawnRotation)
+	end
+
+	-- Настраиваем гуманоида
+	local humanoid = rig:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.AutoRotate = false
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+		humanoid.PlatformStand = false
+	end
+
+	-- Пауза для подписок других скриптов (инвентарь, одежда и т.д.)
+	task.wait(0.1)
+	player.Character = rig
+
+	-- Сохраняем пол игрока в StringValue, чтобы клиент знал его всегда
+	local genderValue = player:FindFirstChild("PlayerGender")
+	if not genderValue then
+		genderValue = Instance.new("StringValue")
+		genderValue.Name = "PlayerGender"
+		genderValue.Parent = player
+	end
+	genderValue.Value = chosenGender
+
+	print("?? Заспавнен " .. chosenGender .. " персонаж для " .. player.Name)
+
+	-- Проигрываем idle-анимацию
+	if idleAnimation and humanoid then
+		local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+		animator.Parent = humanoid
+		local idleTrack = animator:LoadAnimation(idleAnimation)
+		idleTrack.Looped = true
+		idleTrack:Play()
+		print("??? Кастомная idle-анимация для " .. player.Name)
+	end
+end)

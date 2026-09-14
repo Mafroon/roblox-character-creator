@@ -1,0 +1,50 @@
+-- StarterGui.MainMenuGui.UniversalBorderEffect (или другое место)
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local function brightenColor(color: Color3, factor: number): Color3
+	local h, s, v = color:ToHSV()
+	v = math.clamp(v + factor, 0, 1)
+	return Color3.fromHSV(h, s, v)
+end
+
+local function applyEffect(button)
+	if not button:IsA("GuiButton") then return end
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if not stroke then return end
+
+	local originalColor = stroke.Color
+	local originalThickness = stroke.Thickness
+	local originalTransparency = stroke.Transparency
+
+	local brightColor = brightenColor(originalColor, 0.2) -- на 20% ярче
+	local hoverThickness = math.min(originalThickness + 2, 10) -- можно регулировать
+
+	button.MouseEnter:Connect(function()
+		stroke.Color = brightColor
+		stroke.Thickness = hoverThickness
+		stroke.Transparency = 0
+	end)
+
+	button.MouseLeave:Connect(function()
+		stroke.Color = originalColor
+		stroke.Thickness = originalThickness
+		stroke.Transparency = originalTransparency
+	end)
+end
+
+-- Применяем ко всем уже существующим кнопкам с тегом "HoverBorder"
+for _, button in ipairs(CollectionService:GetTagged("HoverBorder")) do
+	if button:IsDescendantOf(playerGui) then
+		applyEffect(button)
+	end
+end
+
+-- И к тем, что появятся позже
+CollectionService:GetInstanceAddedSignal("HoverBorder"):Connect(function(button)
+	if button:IsDescendantOf(playerGui) then
+		applyEffect(button)
+	end
+end)

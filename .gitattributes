@@ -1,0 +1,6 @@
+# Preserve files byte-for-byte: they are Windows-1251 encoded with CRLF
+# line endings. Do not let git normalize EOLs (would churn every line).
+*.txt -text
+*.md text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf

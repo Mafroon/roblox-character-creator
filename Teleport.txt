@@ -1,0 +1,35 @@
+-- Серверный скрипт (Script в ServerScriptService)
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ID вашего основного игрового плейса (замените на свой!)
+local GAME_PLACE_ID = 95945939718701
+
+-- Создаём RemoteEvent для связи с клиентом
+local teleportEvent = ReplicatedStorage:WaitForChild("RequestTeleport")
+
+-- Функция, которая и будет телепортировать
+local function teleportPlayer(player, chosenElement)
+	-- Создаём объект с настройками телепортации (современный способ)
+	local teleportOptions = Instance.new("TeleportOptions")
+
+	-- Передаём в новый плейс выбранную игроком стихию
+	teleportOptions:SetTeleportData({ element = chosenElement })
+
+	-- Запускаем телепортацию
+	local success, errorMessage = pcall(function()
+		TeleportService:TeleportAsync(GAME_PLACE_ID, {player}, teleportOptions)
+	end)
+
+	if not success then
+		warn("? Ошибка телепортации игрока " .. player.Name .. ": " .. errorMessage)
+		-- Здесь можно добавить логику для повторной попытки
+	end
+end
+
+-- Слушаем запрос от клиента
+teleportEvent.OnServerEvent:Connect(function(player, chosenElement)
+	print("Получен запрос на телепортацию от " .. player.Name .. " со стихией " .. chosenElement)
+	teleportPlayer(player, chosenElement)
+end)

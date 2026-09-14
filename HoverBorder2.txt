@@ -1,0 +1,233 @@
+-- LocalScript внутри ElementMenuGui (HoverBorder2)
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local elementMenu = playerGui:WaitForChild("ElementMenuGui")
+
+local lastClickTime = 0
+local DEBOUNCE_TIME = 0.3   -- можно менять
+
+local function brightenColor(color: Color3, factor: number): Color3
+	local h, s, v = color:ToHSV()
+	v = math.clamp(v + factor, 0, 1)
+	return Color3.fromHSV(h, s, v)
+end
+
+-- Конфигурация стихий: имя кнопки > { отображаемое имя, цвет }
+local ELEMENT_CONFIG = {
+	FireButton  = { Name = "Fire",  Color = Color3.fromRGB(236, 124, 27) },
+	WaterButton = { Name = "Water", Color = Color3.fromRGB(72, 165, 236) },
+	EarthButton = { Name = "Earth", Color = Color3.fromRGB(110, 191, 66) },
+	AirButton   = { Name = "Air",   Color = Color3.fromRGB(164, 188, 195) },
+	LightButton = { Name = "Light", Color = Color3.fromRGB(213, 169, 109) },
+	GloomButton = { Name = "Gloom", Color = Color3.fromRGB(157, 136, 117) },
+}
+
+-- Ищем TextLabel, куда будем выводить название стихии
+local yourChoiceLabel = nil
+local yourChoiceFrame = elementMenu:FindFirstChild("YourChoiceFrame", true)
+
+local playButton = nil
+local buttonContainer = elementMenu:FindFirstChild("ButtonContainer")
+if buttonContainer then
+	playButton = buttonContainer:FindFirstChild("PlayButton")
+end
+
+if yourChoiceFrame then
+	yourChoiceLabel = yourChoiceFrame:FindFirstChild("Element")
+end
+
+-- ===== ЛОГИКА ПОДСВЕТКИ КНОПОК (без изменений в основной части) =====
+local buttonHighlights = {}
+
+local function setupElementButton(button: GuiButton)
+	if buttonHighlights[button] then
+		return buttonHighlights[button]
+	end
+
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if not stroke then
+		buttonHighlights[button] = false
+		return nil
+	end
+
+	local originalColor = stroke.Color
+	local originalThickness = stroke.Thickness
+	local originalTransparency = stroke.Transparency
+	local hoverThickness = math.min(originalThickness + 2, 10)
+	local hoverColor = brightenColor(originalColor, 0.2)
+
+	button.MouseEnter:Connect(function()
+		if button.Selected then return end
+		stroke.Color = hoverColor
+		stroke.Thickness = hoverThickness
+		stroke.Transparency = 0
+	end)
+
+	button.MouseLeave:Connect(function()
+		if button.Selected then return end
+		stroke.Color = originalColor
+		stroke.Thickness = originalThickness
+		stroke.Transparency = originalTransparency
+	end)
+
+	local function applySelectedHighlight()
+		stroke.Color = hoverColor
+		stroke.Thickness = hoverThickness
+		stroke.Transparency = 0
+	end
+
+	local function clearSelectedHighlight()
+		stroke.Color = originalColor
+		stroke.Thickness = originalThickness
+		stroke.Transparency = originalTransparency
+	end
+
+	local highlightFunctions = {
+		select = applySelectedHighlight,
+		deselect = clearSelectedHighlight
+	}
+	buttonHighlights[button] = highlightFunctions
+	return highlightFunctions
+end
+
+local selectedButton: GuiButton? = nil
+
+-- Обновление текстового поля при выборе/сбросе
+local function updateChoiceLabel(button: GuiButton?)
+	if not yourChoiceLabel then return end
+
+	if button then
+		local config = ELEMENT_CONFIG[button.Name]
+		if config then
+			yourChoiceLabel.Text = config.Name
+			yourChoiceLabel.TextColor3 = config.Color
+			yourChoiceLabel.Visible = true
+			if playButton then
+				playButton.BackgroundTransparency = 0.3
+			end
+		else
+			yourChoiceLabel.Visible = false
+			if playButton then
+				playButton.BackgroundTransparency = 1
+			end
+		end
+	else
+		yourChoiceLabel.Text = ""
+		yourChoiceLabel.Visible = false
+		if playButton then
+			playButton.BackgroundTransparency = 1
+		end
+	end
+end
+
+local function toggleSelection(button: GuiButton)
+	local now = tick()
+	if now - lastClickTime < DEBOUNCE_TIME then
+		return   -- игнорируем слишком быстрый повтор
+	end
+	lastClickTime = now
+
+	local highlight = setupElementButton(button)
+	if not highlight then return end
+
+	if selectedButton == button then
+		-- Снимаем выделение
+		highlight.deselect()
+		selectedButton = nil
+		updateChoiceLabel(nil)
+	else
+		-- Снимаем выделение с предыдущей
+		if selectedButton then
+			local prevHighlight = buttonHighlights[selectedButton]
+			if prevHighlight then
+				prevHighlight.deselect()
+			end
+		end
+		-- Выделяем новую
+		highlight.select()
+		selectedButton = button
+		updateChoiceLabel(button)
+	end
+end
+
+local function deselectAllButtons()
+	if selectedButton then
+		local highlight = buttonHighlights[selectedButton]
+		if highlight then
+			highlight.deselect()
+			selectedButton.Selected = false
+		end
+		selectedButton = nil
+		updateChoiceLabel(nil)
+	end
+end
+
+-- ===== ПОДКЛЮЧЕНИЕ КНОПОК =====
+local function connectElementButton(button: GuiButton)
+	local config = ELEMENT_CONFIG[button.Name]
+	if config then
+		-- Настраиваем hover/подсветку один раз
+		setupElementButton(button)
+		-- Подключаем клик
+		button.Activated:Connect(function()
+			toggleSelection(button)
+		end)
+	end
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
+resetChoiceEvent.Event:Connect(deselectAllButtons)
+
+-- ===== СКАНИРОВАНИЕ =====
+if elementMenu then
+	local function scan(parent: Instance)
+		for _, child in ipairs(parent:GetChildren()) do
+			if child:IsA("GuiButton") and ELEMENT_CONFIG[child.Name] then
+				connectElementButton(child)
+			end
+			scan(child)
+		end
+	end
+	scan(elementMenu)
+
+	-- Кнопка "Назад"
+	local backButton = elementMenu:FindFirstChild("BackButton", true)
+	if backButton and backButton:IsA("GuiButton") then
+		backButton.Activated:Connect(deselectAllButtons)
+	else
+		warn("BackButton не найден")
+	end
+
+	-- Инициализация состояния метки (скрыта, пока ничего не выбрано)
+	updateChoiceLabel(nil)
+
+	print("? Hover-эффекты, выбор стихий и отображение названия работают.")
+else
+	warn("ElementMenuGui не найден")
+end
+
+-- ===============================
+-- Обработка нажатия PlayButton
+-- ===============================
+local chosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
+
+if playButton then
+	playButton.Activated:Connect(function()
+		if selectedButton then
+			local config = ELEMENT_CONFIG[selectedButton.Name]
+			if config then
+				-- Отправляем имя стихии в первый скрипт
+				chosenEvent:Fire(config.Name)
+			else
+				warn("Не удалось определить конфигурацию для кнопки " .. selectedButton.Name)
+			end
+		else
+			-- Ничего не выбрано – можно добавить звук или анимацию "ошибки", если нужно
+			print("Стихия не выбрана, переход заблокирован.")
+		end
+	end)
+else
+	warn("PlayButton не найден в ElementMenuGui.ButtonContainer")
+end

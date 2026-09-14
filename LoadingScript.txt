@@ -1,0 +1,85 @@
+-- ReplicatedFirst / LoadingScreenClient (LocalScript)
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local startGameEvent = ReplicatedStorage:WaitForChild("StartGameEvent", 10)
+if not startGameEvent then
+	warn("StartGameEvent не найден!")
+	return
+end
+
+local FINAL_HEIGHT = 0.45
+local GRADIENT_AMPLITUDE = 90
+local GRADIENT_CENTER = 90
+local GRADIENT_PERIOD = 4
+local STOP_GRADIENT_DURATION = 1
+local TWEEN_DURATION = 2
+local MIN_SHOW_TIME = 3
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui", 5)
+if not playerGui then return end
+
+ReplicatedFirst:RemoveDefaultLoadingScreen()
+
+local loadingGui = ReplicatedFirst:WaitForChild("LoadingScreen", 10):Clone()
+loadingGui.Parent = playerGui
+
+-- скрываем другие GUI
+for _, gui in playerGui:GetChildren() do
+	if gui:IsA("ScreenGui") and gui ~= loadingGui then
+		gui.Enabled = false
+	end
+end
+
+local guiBlocker = playerGui.ChildAdded:Connect(function(child)
+	if child:IsA("ScreenGui") and child ~= loadingGui then
+		child.Enabled = false
+	end
+end)
+
+local backFrame = loadingGui:WaitForChild("BackFrame", 5)
+local continueFrame = backFrame and backFrame:WaitForChild("ContinueFrame", 5)
+if not continueFrame then return end
+continueFrame.Position = UDim2.new(0.5, 0, 1.1, 0)
+
+local line = backFrame:WaitForChild("Line", 5)
+if not line then return end
+line.Rotation = 90
+line.Size = UDim2.new(1, 0, 0, 0)
+
+local draftFrame = backFrame:WaitForChild("Names", 5):WaitForChild("Name", 5):WaitForChild("Draft", 5)
+local gradient = draftFrame:WaitForChild("UIGradient", 5)
+if not gradient then return end
+
+local accumulatedTime = 0
+local renderConnection = RunService.RenderStepped:Connect(function(dt)
+	accumulatedTime += dt
+	local angle = GRADIENT_CENTER + GRADIENT_AMPLITUDE * math.sin(accumulatedTime * (2 * math.pi / GRADIENT_PERIOD))
+	gradient.Rotation = angle
+end)
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local startTime = os.clock()
+while os.clock() - startTime < MIN_SHOW_TIME do task.wait(0.1) end
+
+if renderConnection then renderConnection:Disconnect() end
+
+local stopGradTween = TweenService:Create(gradient, TweenInfo.new(STOP_GRADIENT_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 90})
+stopGradTween:Play()
+stopGradTween.Completed:Wait()
+
+local showInfo = TweenInfo.new(TWEEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+TweenService:Create(line, showInfo, {Size = UDim2.new(1, 0, FINAL_HEIGHT, 0)}):Play()
+TweenService:Create(continueFrame, showInfo, {Position = UDim2.new(0.5, 0, 0.77, 0)}):Play()
+
+local continueButton = continueFrame:WaitForChild("ContinueButton", 5)
+if continueButton then continueButton.MouseButton1Click:Wait() end
+
+guiBlocker:Disconnect()
+startGameEvent:Fire()
+loadingGui:Destroy()
