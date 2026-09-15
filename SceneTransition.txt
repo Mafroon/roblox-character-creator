@@ -16,6 +16,7 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
 
 -- Ждём сигнал от загрузочного экрана (StartGameEvent должен быть BindableEvent в ReplicatedStorage)
 local startGameEvent = ReplicatedStorage:WaitForChild("StartGameEvent")
@@ -155,8 +156,24 @@ local function applyGender(gender)
 	end
 end
 
-maleButton.MouseButton1Click:Connect(function() applyGender("male") end)
-femaleButton.MouseButton1Click:Connect(function() applyGender("female") end)
+-- Activated вместо MouseButton1Click: работает и с геймпадом/тачем (M3)
+maleButton.Activated:Connect(function() applyGender("male") end)
+femaleButton.Activated:Connect(function() applyGender("female") end)
+
+-- ===================== СБОЙ ТЕЛЕПОРТАЦИИ =====================
+-- Финальный переход прячет все меню ещё до запроса телепортации. Если
+-- TeleportAsync падает (сервер в Teleport.txt только предупреждает), игрок
+-- остаётся в этом плейсе без интерфейса. TeleportInitFailed приходит и на
+-- клиент — восстанавливаем меню стихий, фон и камеру.
+-- restoreAfterTeleportFailure назначается в transitionToFinal.
+local restoreAfterTeleportFailure = nil
+
+TeleportService.TeleportInitFailed:Connect(function(_player, teleportResult, errorMessage)
+	warn("Телепортация не удалась: " .. tostring(teleportResult) .. " (" .. tostring(errorMessage) .. ")")
+	if restoreAfterTeleportFailure then
+		restoreAfterTeleportFailure()
+	end
+end)
 
 -- ===================== ПЕРЕХОДЫ =====================
 
@@ -222,6 +239,7 @@ local function transitionFromCreation()
 
 	-- ===== Появление ElementMenuGui =====
 	SceneEffects.showElementMenu()
+	ElementMenu.setInputEnabled(true)
 
 	-- ===== Анимация камеры: поворот ВПРАВО на 90° (от -pi/2 к -pi) =====
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, -math.pi, 1.0)
@@ -243,6 +261,9 @@ end
 local function transitionBackToCreation()
 	if isTransitioning then return end
 	isTransitioning = true
+	-- Панели меню стихий уезжают ~0.8с, всё это время GUI ещё активен:
+	-- блокируем кнопки стихий, чтобы клик в этом окне не испортил состояние
+	ElementMenu.setInputEnabled(false)
 
 	-- Закрываем все открытые инвентари (на всякий случай)
 	InventoryController.closeAll()
@@ -275,9 +296,39 @@ end
 local function transitionToFinal(chosenElement)
 	if isTransitioning then return end
 	isTransitioning = true
+	-- Блокируем кнопки стихий на время перехода (GUI активен ещё ~0.8с)
+	ElementMenu.setInputEnabled(false)
 
 	-- Закрываем все инвентари/палитры
 	InventoryController.closeAll()
+
+	-- === EntranceGui нужен для перехода: проверяем ДО скрытия меню ===
+	-- Иначе при отсутствии экземпляра WaitForChild висит вечно, а меню уже
+	-- спрятаны - игровой процесс заблокирован навсегда (bugs_2.md, L4)
+	local entranceGui = playerGui:WaitForChild("EntranceGui", 10)
+	local entranceBackFrame = entranceGui and entranceGui:FindFirstChild("BackFrame")
+	local entranceFrame = entranceGui and entranceGui:FindFirstChild("Frame")
+	if not entranceBackFrame or not entranceFrame then
+		warn("EntranceGui/BackFrame/Frame не найдены - финальный переход отменён")
+		ElementMenu.setInputEnabled(true)
+		isTransitioning = false
+		return
+	end
+
+	-- === Восстановление после неудачной телепортации (bugs_2.md, M2) ===
+	-- Возвращаем фон, меню стихий (выбор в HoverBorder2 сохранён) и камеру
+	restoreAfterTeleportFailure = function()
+		local backInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(bgLeft, backInfo,
+			{Position = bgLeftOriginalPos}):Play()
+		TweenService:Create(bgRight, backInfo,
+			{Position = bgRightOriginalPos}):Play()
+		entranceGui.Enabled = false
+		ElementMenu.setInputEnabled(true)
+		SceneEffects.showElementMenu()
+		SceneEffects.showYourChoiceFrame()
+		SceneEffects.tweenCameraYaw(cameraBasePos, -3 * math.pi / 2, -math.pi, 1.0)
+	end
 
 	-- === Скрываем ElementMenuGui ===
 	SceneEffects.hideElementMenu({ yourChoice = "slide" })
@@ -291,11 +342,6 @@ local function transitionToFinal(chosenElement)
 		{Position = UDim2.new(-2, 0, 0.5, 0)}):Play()
 	TweenService:Create(bgRight, tweenInfo,
 		{Position = UDim2.new(2, 0, 0.5, 0)}):Play()
-
-	-- === Подготовка EntranceGui (будет появляться позже) ===
-	local entranceGui = playerGui:WaitForChild("EntranceGui")
-	local entranceBackFrame = entranceGui:WaitForChild("BackFrame")
-	local entranceFrame = entranceGui:WaitForChild("Frame")
 
 	-- Прозрачность нужно менять и у детей: BackgroundTransparency родителя на них
 	-- не действует, и при включении GUI они вспыхнули бы раньше твина.
@@ -334,6 +380,8 @@ local function transitionToFinal(chosenElement)
 	-- === Поворот и подъём камеры ===
 	local camera = workspace.CurrentCamera
 	if not camera then
+		warn("CurrentCamera отсутствует - финальный переход отменён")
+		restoreAfterTeleportFailure()
 		isTransitioning = false
 		return
 	end
@@ -391,29 +439,35 @@ local function transitionToFinal(chosenElement)
 			end
 		end)
 
-		tweenForward.Completed:Connect(function()
+		tweenForward.Completed:Connect(function(playbackStateFwd)
+			if playbackStateFwd ~= Enum.PlaybackState.Completed then return end
 			angleVal:Destroy()
 			heightVal:Destroy()
 			isTransitioning = false
 			print("Финальный переход завершён. Элемент:", chosenElement)
+
+			-- Телепортируем только когда анимация полностью доиграла:
+			-- раньше запрос уходил на 0.7с раньше окончания движения и проявления
+			-- EntranceGui (bugs_2.md, L5)
+			local requestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport", 10)
+			if requestTeleport then
+				requestTeleport:FireServer(chosenElement) -- chosenElement - имя выбранной стихии
+			else
+				warn("RequestTeleport не найден - возврат в меню стихий")
+				restoreAfterTeleportFailure()
+			end
 		end)
-
-		task.wait(0.5) -- Небольшая пауза после анимации
-
-		-- Отправляем запрос на сервер вместе с выбором игрока
-		local requestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport")
-		requestTeleport:FireServer(chosenElement) -- chosenElement - имя выбранной стихии
 	end)
 end
 
 -- ===================== ПОДКЛЮЧЕНИЕ КНОПОК И СОБЫТИЙ =====================
-slot1.MouseButton1Click:Connect(transitionToCreation)
-slot2.MouseButton1Click:Connect(transitionToCreation)
-backBtn.MouseButton1Click:Connect(returnToMenu)
-nextBtn.MouseButton1Click:Connect(transitionFromCreation)
+slot1.Activated:Connect(transitionToCreation)
+slot2.Activated:Connect(transitionToCreation)
+backBtn.Activated:Connect(returnToMenu)
+nextBtn.Activated:Connect(transitionFromCreation)
 
 -- Кнопка Back в меню стихий
-elementBackButton.MouseButton1Click:Connect(transitionBackToCreation)
+elementBackButton.Activated:Connect(transitionBackToCreation)
 
 ElementChosenEvent.Event:Connect(function(elementName)
 	print("Выбрана стихия:", elementName, "– выполняю финальный переход.")

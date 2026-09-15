@@ -23,7 +23,7 @@ local function teleportPlayer(player, chosenElement)
 	end)
 
 	if not success then
-		warn("? Ошибка телепортации игрока " .. player.Name .. ": " .. errorMessage)
+		warn("Ошибка телепортации игрока " .. player.Name .. ": " .. errorMessage)
 		-- Здесь можно добавить логику для повторной попытки
 	end
 end

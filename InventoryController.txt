@@ -74,6 +74,7 @@ local categoryItemCache = {}        -- кэш предметов для рандомайзера
 local equipTextLabels = {}          -- [категория] = TextLabel с названием предмета
 local lastEquipClickTime = 0        -- защита от двойного клика (тоггл "надеть-снять" туда-обратно)
 local lastRandomTime = 0            -- защита от спама кнопкой рандомайзера
+local lastInventoryClickTime = 0    -- защита от двойного клика по кнопкам инвентарей
 
 -- ===================== ЗАКРЫТИЕ ИНВЕНТАРЕЙ =====================
 local function closeAllInventories()
@@ -223,7 +224,14 @@ local function connectMainButton(guiPath, targetFrame)
 	for _, child in ipairs(guiPath) do
 		btn = btn:WaitForChild(child)
 	end
-	btn.MouseButton1Click:Connect(function()
+	-- Activated: работает и с геймпадом (MouseButton1Click - только мышь/тач)
+	btn.Activated:Connect(function()
+		-- Дебаунс: второй клик во время InvokeServer внутри populateInventory
+		-- успевает закрыть только что открытый инвентарь (тоггл по
+		-- currentOpenInventory срабатывает раньше окончания загрузки)
+		local now = os.clock()
+		if now - lastInventoryClickTime < 0.25 then return end
+		lastInventoryClickTime = now
 		switchToMainInventory(targetFrame)
 	end)
 end
@@ -234,7 +242,7 @@ local function connectColorButton(guiPath, colorPalette, parentInventory, catego
 	for _, child in ipairs(guiPath) do
 		btn = btn:WaitForChild(child)
 	end
-	btn.MouseButton1Click:Connect(function()
+	btn.Activated:Connect(function()
 		openColorPicker(colorPalette, categoryName, parentInventory)
 	end)
 end
@@ -326,7 +334,7 @@ function InventoryController.init(deps)
 
 	-- Кнопка цвета кожи (особый случай: палитра без родительского инвентаря)
 	local skinColorButton = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Frame"):WaitForChild("SkinColorButton")
-	skinColorButton.MouseButton1Click:Connect(function()
+	skinColorButton.Activated:Connect(function()
 		if currentOpenInventory == ColorSkin then
 			-- Повторный клик закрывает палитру одним нажатием
 			if colorPickers[ColorSkin] then
@@ -351,7 +359,7 @@ function InventoryController.init(deps)
 	preloadCategories()
 
 	local randomButton = creationGui:WaitForChild("Random"):WaitForChild("Frame"):WaitForChild("RandomButton")
-	randomButton.MouseButton1Click:Connect(function()
+	randomButton.Activated:Connect(function()
 		-- Дебаунс: один клик и так шлёт ~12 запросов на сервер
 		local now = os.clock()
 		if now - lastRandomTime < 0.5 then return end

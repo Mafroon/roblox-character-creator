@@ -28,6 +28,10 @@ local ELEMENTS = {
 
 local currentInfoFrame = nil    -- какой фрейм открыт сейчас
 local isInfoAnimating = false
+-- Блокировка кликов на время переходов: SceneEffects.hideElementMenu выключает
+-- ElementMenuGui только через 0.8с, и без этого флага клик в этом окне
+-- успевает переоткрыть инфо-фрейм, который переход только что закрыл
+local inputEnabled = true
 
 -- ===================== АНИМАЦИЯ ИНФО-ФРЕЙМОВ =====================
 -- ВАЖНО: TweenBase.Completed срабатывает и при отмене твина (PlaybackState.Cancelled),
@@ -53,6 +57,9 @@ end
 local function showInfoFrame(infoFrame, callback)
 	infoFrame.Visible = true
 	infoFrame.Position = INFO_HIDE_POS
+	-- Фиксируем сразу, а не в Completed: переход может начаться посреди
+	-- анимации, и closeOpenInfoFrame должен найти фрейм, чтобы его закрыть
+	currentInfoFrame = infoFrame
 	local tween = TweenService:Create(infoFrame,
 		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = INFO_SHOW_POS})
@@ -61,7 +68,8 @@ local function showInfoFrame(infoFrame, callback)
 		if playbackState == Enum.PlaybackState.Completed then
 			if callback then callback() end
 		else
-			-- Фрейм прерван переходом: НЕ считаем его открытым
+			-- Фрейм прерван переходом (closeOpenInfoFrame уже сбросил
+			-- currentInfoFrame): снимаем только флаг анимации
 			isInfoAnimating = false
 		end
 	end)
@@ -69,6 +77,7 @@ end
 
 -- Обработчик нажатия на кнопку стихии (открыть/закрыть/переключить)
 local function onElementButtonClicked(infoFrame)
+	if not inputEnabled then return end
 	if isInfoAnimating then return end
 
 	if currentInfoFrame == infoFrame then
@@ -82,7 +91,7 @@ local function onElementButtonClicked(infoFrame)
 		local previous = currentInfoFrame
 		local function openNew()
 			showInfoFrame(infoFrame, function()
-				currentInfoFrame = infoFrame
+				-- currentInfoFrame уже выставлен в showInfoFrame до анимации
 				isInfoAnimating = false
 			end)
 		end
@@ -131,11 +140,19 @@ function ElementMenu.init(deps)
 		if not button then
 			warn("Кнопка " .. element.button .. " не найдена в ElementMenuGui!")
 		else
-			button.MouseButton1Click:Connect(function()
+			-- Activated: как в HoverBorder2 для тех же кнопок (работает и с геймпадом)
+			button.Activated:Connect(function()
 				onElementButtonClicked(infoFrame)
 			end)
 		end
 	end
+end
+
+-- Включает/выключает обработку кликов по кнопкам стихий.
+-- SceneTransition выключает на время переходов (пока панели меню стихий
+-- уезжают, GUI ещё активен ~0.8с) и включает при возврате в меню стихий.
+function ElementMenu.setInputEnabled(enabled)
+	inputEnabled = enabled
 end
 
 -- Принудительно убрать открытый инфо-фрейм (если есть). Вызывается при переходах.
@@ -152,8 +169,12 @@ function ElementMenu.closeOpenInfoFrame(duration, hideOnComplete)
 		{Position = INFO_HIDE_POS})
 	closeTween:Play()
 	if hideOnComplete then
-		closeTween.Completed:Connect(function()
-			frameToClose.Visible = false
+		closeTween.Completed:Connect(function(playbackState)
+			-- Completed срабатывает и при отмене: повторное открытие фрейма
+			-- отменило бы этот твин, и прятать его в этом случае нельзя
+			if playbackState == Enum.PlaybackState.Completed then
+				frameToClose.Visible = false
+			end
 		end)
 	end
 	return closeTween

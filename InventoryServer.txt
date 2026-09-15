@@ -135,10 +135,11 @@ local function unequipCategory(player, category)
 	end
 end
 
--- Надевает один предмет (заменяет предыдущие в категории)
+-- Надевает один предмет (заменяет предыдущие в категории).
+-- Возвращает true, если предмет реально надет (иначе эхо клиенту не отправляем)
 local function equipSingleItem(player, item, category)
 	local char = player.Character
-	if not char then return end
+	if not char then return false end
 
 	unequipCategory(player, category)
 
@@ -162,6 +163,7 @@ local function equipSingleItem(player, item, category)
 		equippedItems[player] = {}
 	end
 	equippedItems[player][category] = { clone }
+	return true
 end
 
 -- Надеть конкретную расу (заменяет текущую)
@@ -319,7 +321,7 @@ end
 
 -- Внутри ServerInventory, функция onCharacterAdded
 local function onCharacterAdded(player, char)
-	print("?? Кастомный персонаж заспавнен:", player.Name)
+	print("Кастомный персонаж заспавнен:", player.Name)
 
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
@@ -356,7 +358,7 @@ local function onCharacterAdded(player, char)
 		-- Поскольку у нас риг.Name = player.Name .. "_CustomAvatar", мы не знаем источник.
 		-- Поэтому просто установим "male" по умолчанию, а при смене пола обновится.
 		genderValue.Value = "male"
-		print("?? PlayerGender не найден, установлен по умолчанию в 'male' для", player.Name)
+		print("PlayerGender не найден, установлен по умолчанию в 'male' для", player.Name)
 	end
 
 	-- Восстанавливаем цвет кожи и выдаём случайную одежду
@@ -365,11 +367,19 @@ local function onCharacterAdded(player, char)
 end
 
 -- ===================== ПОДКЛЮЧЕНИЕ СОБЫТИЙ =====================
-Players.PlayerAdded:Connect(function(player)
+local function onPlayerAdded(player)
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
 	end)
-end)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Игроки, зашедшие до запуска скрипта (например, в Studio Play Solo):
+-- без отката их персонаж не получит одежду и PlayerGender
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(onPlayerAdded, player)
+end
 
 Players.PlayerRemoving:Connect(function(player)
 	-- очистка
@@ -382,6 +392,11 @@ end)
 
 -- Получение списка предметов
 getItemsFunction.OnServerInvoke = function(player, categoryName)
+	-- Валидация как у остальных ремоутов: не-строка роняет FindFirstChild
+	-- с ошибкой, а произвольное имя перечисляет содержимое ServerStorage
+	if typeof(categoryName) ~= "string" or not VALID_EQUIP_CATEGORIES[categoryName] then
+		return {}
+	end
 	if categoryName == "Race" then
 		local raceFolder = ServerStorage:FindFirstChild("Race")
 		if not raceFolder then return {} end
@@ -416,7 +431,7 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 		return
 	end
 
-	print("?? Запрос от", player.Name, "категория:", categoryName, "предмет:", itemName)
+	print("Запрос от", player.Name, "категория:", categoryName, "предмет:", itemName)
 
 	-- Защита от снятия обязательных категорий
 	local nonRemovableCategories = {
@@ -428,9 +443,9 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 	}
 
 	if not itemName then
-		print("? Попытка СНЯТЬ категорию:", categoryName)
+		print("Попытка СНЯТЬ категорию:", categoryName)
 		if nonRemovableCategories[categoryName] then
-			print("? Нельзя снять (защита) –", categoryName)
+			print("Нельзя снять (защита) –", categoryName)
 			return
 		end
 		unequipCategory(player, categoryName)
@@ -480,8 +495,11 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 		return
 	end
 
-	equipSingleItem(player, item, categoryName)
-	equipEvent:FireClient(player, { category = categoryName, item = itemName })
+	-- Эхо только при реальной экипировке: если персонажа нет (окно респавна),
+	-- метка клиента не должна показывать предмет, которого на персонаже нет
+	if equipSingleItem(player, item, categoryName) then
+		equipEvent:FireClient(player, { category = categoryName, item = itemName })
+	end
 end)
 
 -- Изменение цвета

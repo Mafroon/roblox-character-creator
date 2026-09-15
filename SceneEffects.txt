@@ -33,6 +33,10 @@ end
 
 -- ===================== РЕДАКТОР ПЕРСОНАЖА =====================
 
+-- Во всех Completed-обработчиках ниже проверяем playbackState: Completed
+-- срабатывает и при отмене твина (см. ElementMenu), а прятать панели по отмене
+-- нельзя (подробности - в important_docs/bugs_2.md, L3)
+
 -- Показ редактора персонажа (из главного меню или из меню стихий)
 function SceneEffects.showCreationUI()
 	local buttonContainer = ui.buttonContainer
@@ -85,7 +89,8 @@ function SceneEffects.hideCreationUI(onHidden)
 	local tweenBottom = TweenService:Create(buttonContainer, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 1.2, 0)})
 	tweenBottom:Play()
-	tweenBottom.Completed:Connect(function()
+	tweenBottom.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
 		buttonContainer.Visible = false
 	end)
 
@@ -99,14 +104,16 @@ function SceneEffects.hideCreationUI(onHidden)
 	local randomTween = TweenService:Create(ui.randomFrame, TWEEN_INFO,
 		{Position = UDim2.new(1.1, 0, 0.15, 0)})
 	randomTween:Play()
-	randomTween.Completed:Connect(function()
+	randomTween.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
 		ui.randomFrame.Visible = false
 	end)
 
 	local lastTween = TweenService:Create(ui.leftRight, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, -0.1, 0)})
 	lastTween:Play()
-	lastTween.Completed:Connect(function()
+	lastTween.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
 		ui.customizeLeft.Visible = false
 		ui.customizeRight.Visible = false
 		ui.customizeText.Visible = false
@@ -169,7 +176,8 @@ function SceneEffects.hideElementMenu(opts)
 	local btnContainerTween = TweenService:Create(elementButtonContainer, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 1.2, 0)})
 	btnContainerTween:Play()
-	btnContainerTween.Completed:Connect(function()
+	btnContainerTween.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
 		elementButtonContainer.Visible = false
 	end)
 
@@ -181,7 +189,8 @@ function SceneEffects.hideElementMenu(opts)
 	local backFrameTween = TweenService:Create(ui.elementBackFrame, TWEEN_INFO,
 		{Position = UDim2.new(-0.1, 0, 0.4, 0)})
 	backFrameTween:Play()
-	backFrameTween.Completed:Connect(function()
+	backFrameTween.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
 		ui.elementBackFrame.Visible = false
 		ui.elementMenu.Enabled = false
 		if opts.onHidden then opts.onHidden() end
@@ -192,7 +201,8 @@ function SceneEffects.hideElementMenu(opts)
 			{Position = UDim2.new(0.5, 0, 1.1, 0)})
 		yourChoiceTween:Play()
 		if opts.yourChoice == "hide" then
-			yourChoiceTween.Completed:Connect(function()
+			yourChoiceTween.Completed:Connect(function(playbackState)
+				if playbackState ~= Enum.PlaybackState.Completed then return end
 				ui.yourChoiceFrame.Visible = false
 			end)
 		end

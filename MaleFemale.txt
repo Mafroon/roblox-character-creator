@@ -49,7 +49,7 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 	local head = character:FindFirstChild("Head")
 	if head and head:IsA("BasePart") then
 		skinColor = head.Color
-		print("?? Сохранён цвет кожи:", skinColor)
+		print("Сохранён цвет кожи:", skinColor)
 	else
 		-- Если головы нет, пробуем взять цвет любой другой части
 		for _, part in ipairs(character:GetChildren()) do
@@ -89,8 +89,8 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 		end
 		-- Широкую "подстраховку" (перекраска всех BasePart персонажа) убрали:
 		-- она красила бы цветом кожи любой предмет, если тот окажется голым BasePart
-		print("?? Цвет кожи восстановлен после смены пола")
+		print("Цвет кожи восстановлен после смены пола")
 	end
 
-	print("?? Пол игрока " .. player.Name .. " изменён на " .. gender)
+	print("Пол игрока " .. player.Name .. " изменён на " .. gender)
 end)

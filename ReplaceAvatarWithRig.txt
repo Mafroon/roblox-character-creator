@@ -17,7 +17,7 @@ local idleAnimation = ServerStorage:FindFirstChild("Animations") and ServerStora
 
 local rng = Random.new()
 
-Players.PlayerAdded:Connect(function(player)
+local function spawnPlayer(player)
 	-- 50% шанс получить мужской или женский риг
 	local chosenGender = if rng:NextNumber() < 0.5 then "male" else "female"
 	local rigTemplate = if chosenGender == "male" then maleRig else femaleRig
@@ -61,7 +61,7 @@ Players.PlayerAdded:Connect(function(player)
 	end
 	genderValue.Value = chosenGender
 
-	print("?? Заспавнен " .. chosenGender .. " персонаж для " .. player.Name)
+	print("Заспавнен " .. chosenGender .. " персонаж для " .. player.Name)
 
 	-- Проигрываем idle-анимацию
 	if idleAnimation and humanoid then
@@ -70,6 +70,14 @@ Players.PlayerAdded:Connect(function(player)
 		local idleTrack = animator:LoadAnimation(idleAnimation)
 		idleTrack.Looped = true
 		idleTrack:Play()
-		print("??? Кастомная idle-анимация для " .. player.Name)
+		print("Кастомная idle-анимация для " .. player.Name)
 	end
-end)
+end
+
+Players.PlayerAdded:Connect(spawnPlayer)
+
+-- Игроки, зашедшие до запуска скрипта (например, в Studio Play Solo):
+-- без отката риг для них вообще не создаётся
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(spawnPlayer, player)
+end
