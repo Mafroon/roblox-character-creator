@@ -37,6 +37,8 @@ local InventoryController = require(ReplicatedStorage:WaitForChild("InventoryCon
 local ElementMenu = require(ReplicatedStorage:WaitForChild("ElementMenu"))
 
 -- ===================== REMOTE ОБЪЕКТЫ =====================
+-- ElementChosenEvent и ResetElementChoiceEvent - BindableEvent (клиент->клиент,
+-- обмен с HoverBorder2): у RemoteEvent нет ни .Event, ни :Fire()
 local ElementChosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
 -- ===================== ОСНОВНЫЕ ЭЛЕМЕНТЫ ИНТЕРФЕЙСА =====================
@@ -69,7 +71,9 @@ local elementBackButton = elementButtonContainer:WaitForChild("BackButton")
 -- ===================== СОСТОЯНИЕ =====================
 local isTransitioning = false
 local originalMainPos = mainContainer.Position
-local cameraBasePos = Vector3.new(0, 3, 0)
+-- База камеры должна совпадать со стартовой позицией из CameraLockScript (0, 8, 0),
+-- иначе первый переход даёт рывок камеры по высоте
+local cameraBasePos = Vector3.new(0, 8, 0)
 
 -- ===================== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ =====================
 ElementMenu.init({
@@ -108,7 +112,7 @@ elementMenu.Enabled = false
 -- ===================== СМЕНА ПОЛА =====================
 local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")
 
-local genderFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("Gender")
+local genderFrame = customizeLeft:WaitForChild("Frame"):WaitForChild("Gender")
 
 local ACTIVE_COLOR = Color3.fromRGB(180, 180, 180)
 local MALE_INACTIVE_COLOR = Color3.fromRGB(62, 127, 206)
@@ -127,15 +131,17 @@ local function updateGenderButtons(selectedGender)
 	end
 end
 
--- Первичная подсветка из StringValue
+-- Первичная подсветка и слежение из StringValue.
+-- genderValue может быть nil (таймаут WaitForChild) — тогда просто работаем без автоподсветки
 if genderValue then
 	updateGenderButtons(genderValue.Value)
+	-- Слушаем изменения пола (если он меняется не только по кнопке, но и с сервера)
+	genderValue.Changed:Connect(function(newValue)
+		updateGenderButtons(newValue)
+	end)
+else
+	warn("PlayerGender не пришёл за 10 сек - подсветка пола с сервера отключена")
 end
-
--- Слушаем изменения пола (если он меняется не только по кнопке, но и с сервера)
-genderValue.Changed:Connect(function(newValue)
-	updateGenderButtons(newValue)
-end)
 
 -- Запрос смены пола на сервер
 local function applyGender(gender)
@@ -163,15 +169,20 @@ local function returnToMenu()
 	TweenService:Create(mainContainer, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = originalMainPos}):Play()
 
-	SceneEffects.hideCreationUI(function()
-		isTransitioning = false
-	end)
+	SceneEffects.hideCreationUI()
 
-	-- Камера возвращается к прямому виду
+	-- Камера возвращается к прямому виду; разблокируем переход только после её окончания
+	-- (раньше разблокировка происходила по панелям через 0.8с, а камера летит 1.0с)
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, 0, 1.0)
 	if not tweenCam then
 		isTransitioning = false
+		return
 	end
+	tweenCam.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			isTransitioning = false
+		end
+	end)
 end
 
 -- Переход из главного меню в редактор (слоты Slot1/Slot2)
@@ -191,8 +202,10 @@ local function transitionToCreation()
 		isTransitioning = false
 		return
 	end
-	tweenCam.Completed:Connect(function()
-		isTransitioning = false
+	tweenCam.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			isTransitioning = false
+		end
 	end)
 end
 
@@ -216,8 +229,10 @@ local function transitionFromCreation()
 		isTransitioning = false
 		return
 	end
-	tweenCam.Completed:Connect(function()
-		isTransitioning = false   -- разблокируем только после полного завершения камеры
+	tweenCam.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			isTransitioning = false   -- разблокируем только после полного завершения камеры
+		end
 	end)
 
 	-- Появление YourChoiceFrame
@@ -239,19 +254,21 @@ local function transitionBackToCreation()
 	ElementMenu.closeOpenInfoFrame(0.5, true)
 
 	-- === Убираем ElementMenuGui и возвращаем редактор ===
-	SceneEffects.hideElementMenu({
-		onHidden = function()
-			isTransitioning = false
-		end,
-		yourChoice = "hide",
-	})
+	-- (onHidden больше не разблокирует переход: ждём окончания камеры, см. ниже)
+	SceneEffects.hideElementMenu({ yourChoice = "hide" })
 	SceneEffects.showCreationUI()
 
-	-- Камера назад в редактор
+	-- Камера назад в редактор; разблокируем переход только после её окончания
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi, -math.pi/2, 1.0)
 	if not tweenCam then
 		isTransitioning = false
+		return
 	end
+	tweenCam.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			isTransitioning = false
+		end
+	end)
 end
 
 -- Финальный переход из меню стихий (выбор сделан)
@@ -279,11 +296,40 @@ local function transitionToFinal(chosenElement)
 	local entranceGui = playerGui:WaitForChild("EntranceGui")
 	local entranceBackFrame = entranceGui:WaitForChild("BackFrame")
 	local entranceFrame = entranceGui:WaitForChild("Frame")
-	entranceGui.Enabled = true
+
+	-- Прозрачность нужно менять и у детей: BackgroundTransparency родителя на них
+	-- не действует, и при включении GUI они вспыхнули бы раньше твина.
+	-- Запоминаем исходные значения и прячем всё ДО включения GUI.
+	local entranceFadeTargets = {}
+	local function collectAndHideFade(obj)
+		local props = nil
+		if obj:IsA("GuiObject") then
+			props = { BackgroundTransparency = obj.BackgroundTransparency }
+			if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+				props.TextTransparency = obj.TextTransparency
+				props.TextStrokeTransparency = obj.TextStrokeTransparency
+			end
+			if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+				props.ImageTransparency = obj.ImageTransparency
+			end
+		elseif obj:IsA("UIStroke") then
+			props = { Transparency = obj.Transparency }
+		end
+		if props then
+			for prop in pairs(props) do
+				obj[prop] = 1
+			end
+			entranceFadeTargets[obj] = props
+		end
+	end
+
 	entranceBackFrame.Visible = true
-	entranceBackFrame.BackgroundTransparency = 1
 	entranceFrame.Visible = true
-	entranceFrame.BackgroundTransparency = 1
+	collectAndHideFade(entranceBackFrame)
+	collectAndHideFade(entranceFrame)
+	for _, desc in ipairs(entranceBackFrame:GetDescendants()) do collectAndHideFade(desc) end
+	for _, desc in ipairs(entranceFrame:GetDescendants()) do collectAndHideFade(desc) end
+	entranceGui.Enabled = true
 
 	-- === Поворот и подъём камеры ===
 	local camera = workspace.CurrentCamera
@@ -320,7 +366,9 @@ local function transitionToFinal(chosenElement)
 	tweenAngle:Play()
 	tweenHeight:Play()
 
-	tweenAngle.Completed:Connect(function()
+	tweenAngle.Completed:Connect(function(playbackState)
+		if playbackState ~= Enum.PlaybackState.Completed then return end
+
 		-- Пауза после поворота/подъёма
 		task.wait(0.5)
 
@@ -337,10 +385,10 @@ local function transitionToFinal(chosenElement)
 		task.spawn(function()
 			task.wait(0.6)
 			local appearInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			local tweenBack = TweenService:Create(entranceBackFrame, appearInfo, {BackgroundTransparency = 0})
-			local tweenFrame = TweenService:Create(entranceFrame, appearInfo, {BackgroundTransparency = 0})
-			tweenBack:Play()
-			tweenFrame:Play()
+			-- Проявляем и сами фреймы, и их детей (каждый к своей исходной прозрачности)
+			for obj, props in pairs(entranceFadeTargets) do
+				TweenService:Create(obj, appearInfo, props):Play()
+			end
 		end)
 
 		tweenForward.Completed:Connect(function()

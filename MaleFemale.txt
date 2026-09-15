@@ -27,15 +27,22 @@ local function replaceTorso(character, rigModel, partName, bodyPartEnum)
 end
 
 changeGenderEvent.OnServerEvent:Connect(function(player, gender)
+	-- Валидация: иначе любое значение, кроме "male" (в т.ч. мусор от эксплойтера),
+	-- молча выбирает женский риг
+	if gender ~= "male" and gender ~= "female" then
+		warn("MaleFemale: некорректный пол " .. tostring(gender) .. " от " .. tostring(player and player.Name))
+		return
+	end
+
 	if not player or not player.Character then return end
 
 	local character = player.Character
-	local rig = (gender == "male") and maleRig or femaleRig
 
-	if not rig then
+	if not maleRig or not femaleRig then
 		warn("Риг для пола " .. gender .. " не найден")
 		return
 	end
+	local rig = (gender == "male") and maleRig or femaleRig
 
 	-- 1. Запоминаем текущий цвет кожи (возьмём цвет головы, он всегда есть)
 	local skinColor = nil
@@ -80,12 +87,8 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 				part.Color = skinColor
 			end
 		end
-		-- Подстраховка: перекрашиваем вообще все BasePart
-		for _, obj in ipairs(character:GetChildren()) do
-			if obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
-				obj.Color = skinColor
-			end
-		end
+		-- Широкую "подстраховку" (перекраска всех BasePart персонажа) убрали:
+		-- она красила бы цветом кожи любой предмет, если тот окажется голым BasePart
 		print("?? Цвет кожи восстановлен после смены пола")
 	end
 

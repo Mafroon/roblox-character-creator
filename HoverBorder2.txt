@@ -1,4 +1,15 @@
--- LocalScript внутри ElementMenuGui (HoverBorder2)
+--[[
+	LocalScript внутри ElementMenuGui (HoverBorder2).
+
+	ВАЖНО: это не устаревшая альтернатива HoverBorder, а НЕОБХОДИМЫЙ скрипт -
+	единственный, кто передаёт выбор стихии дальше: PlayButton -> ElementChosenEvent.
+	Без него финальный переход (SceneTransition) недостижим - не удалять.
+
+	Требует в ReplicatedStorage ДВА BindableEvent (не RemoteEvent!):
+	  - ElementChosenEvent       - выбор стихии отсюда в SceneTransition
+	  - ResetElementChoiceEvent  - сброс выбора из SceneTransition обратно сюда
+	У RemoteEvent нет ни .Event, ни :Fire(), код с RemoteEvent упал бы при старте.
+]]
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -156,7 +167,7 @@ local function deselectAllButtons()
 		local highlight = buttonHighlights[selectedButton]
 		if highlight then
 			highlight.deselect()
-			selectedButton.Selected = false
+			-- GuiButton.Selected не влияет на Custom-кнопки, поэтому не трогаем
 		end
 		selectedButton = nil
 		updateChoiceLabel(nil)
@@ -177,6 +188,7 @@ local function connectElementButton(button: GuiButton)
 end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- BindableEvent (клиент->клиент): у RemoteEvent нет .Event и :Fire()
 local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
 resetChoiceEvent.Event:Connect(deselectAllButtons)
 
@@ -211,6 +223,7 @@ end
 -- ===============================
 -- Обработка нажатия PlayButton
 -- ===============================
+-- BindableEvent (клиент->клиент): у RemoteEvent нет :Fire()
 local chosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
 if playButton then

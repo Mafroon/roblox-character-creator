@@ -210,6 +210,11 @@ end
 
 -- ===================== КАМЕРА =====================
 
+-- Активный поворот камеры: новый вызов отменяет предыдущий, иначе два обработчика
+-- Changed одновременно пишут camera.CFrame (мерцание) и твины мешают друг другу
+local activeYawTween = nil
+local activeYawValue = nil
+
 -- Плавный поворот камеры вокруг вертикальной оси через NumberValue.
 -- Возвращает запущенный Tween или nil, если CurrentCamera отсутствует.
 function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
@@ -217,6 +222,15 @@ function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
 	if not camera then
 		return nil
 	end
+
+	if activeYawTween then
+		activeYawTween:Cancel()
+	end
+	if activeYawValue then
+		activeYawValue:Destroy()
+	end
+	activeYawTween = nil
+	activeYawValue = nil
 
 	local angleVal = Instance.new("NumberValue")
 	angleVal.Value = fromAngle
@@ -227,8 +241,15 @@ function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
 		camera.CFrame = CFrame.new(basePos) * CFrame.Angles(0, angleVal.Value, 0)
 	end)
 	tweenCam.Completed:Connect(function()
-		angleVal:Destroy()
+		-- Чистим только если это ещё актуальный твин (не отменён новым вызовом)
+		if activeYawValue == angleVal then
+			angleVal:Destroy()
+			activeYawTween = nil
+			activeYawValue = nil
+		end
 	end)
+	activeYawTween = tweenCam
+	activeYawValue = angleVal
 	tweenCam:Play()
 	return tweenCam
 end

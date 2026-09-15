@@ -2,6 +2,9 @@
     ServerInventory – Полная версия с исправлениями.
     Использует _G для синхронизации цвета кожи, ожидает Head вместо задержек.
     Поместить в ServerScriptService.
+
+    Требует в ReplicatedStorage RemoteFunction "GetEquippedItems" - снимок
+    надетых предметов и цветов категорий для клиента (InventoryController.init).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,13 +13,24 @@ local Players = game:GetService("Players")
 
 -- ===================== ХРАНИЛИЩА =====================
 local equippedItems = {}           -- [player] = { [category] = {item, ...} }
+local categoryColors = {}          -- [player] = { [category] = Color3 } - выбранные цвета категорий
 _G.PlayerSkinColors = _G.PlayerSkinColors or {}   -- Глобальная таблица для синхронизации
 
 -- ===================== REMOTE ОБЪЕКТЫ =====================
-local startGameEvent = ReplicatedStorage:WaitForChild("StartGameEvent")
+-- StartGameEvent здесь НЕ подключаем: это BindableEvent, он не пересекает
+-- границу клиент/сервер, серверное подключение никогда бы не сработало
 local equipEvent = ReplicatedStorage:WaitForChild("EquipItem")
 local getItemsFunction = ReplicatedStorage:WaitForChild("GetInventoryItems")
 local changeColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
+local getEquippedFunction = ReplicatedStorage:WaitForChild("GetEquippedItems")
+
+-- ===================== БЕЗОПАСНОСТЬ =====================
+-- Белый список категорий: без него любая папка ServerStorage (Gender, Animations...)
+-- проходит как "категория", и в персонажа клонируют целый риг
+local VALID_EQUIP_CATEGORIES = {
+	Shirt = true, Pants = true, Eyes = true, Mouth = true,
+	Hair = true, FacialHair = true, Extra = true, Race = true,
+}
 
 -- ===================== ЦВЕТОВЫЕ ПАЛИТРЫ =====================
 local pleasantColors = {
@@ -49,10 +63,14 @@ local function getPleasantColor(rng, accentChance)
 	end
 end
 
--- Применение цвета к категории
+-- Применение цвета к категории (и запоминание для будущих перевдеваний)
 local function applyCategoryColor(player, category, color)
 	local char = player.Character
 	if not char then return end
+
+	-- Запоминаем цвет: equipSingleItem/applyRace вернут его при переэкипировке категории
+	categoryColors[player] = categoryColors[player] or {}
+	categoryColors[player][category] = color
 
 	if category == "Race" then
 		for _, child in ipairs(char:GetChildren()) do
@@ -127,23 +145,23 @@ local function equipSingleItem(player, item, category)
 	local clone = item:Clone()
 	clone.Parent = char
 
+	-- Возвращаем предмету последний выбранный цвет этой категории
+	-- (иначе переэкипировка сбрасывает цвет на шаблонный)
+	local storedColor = categoryColors[player] and categoryColors[player][category]
+	if storedColor then
+		local parts = clone:GetDescendants()
+		if clone:IsA("BasePart") then table.insert(parts, clone) end
+		for _, desc in ipairs(parts) do
+			if desc:IsA("BasePart") then
+				desc.Color = storedColor
+			end
+		end
+	end
+
 	if not equippedItems[player] then
 		equippedItems[player] = {}
 	end
 	equippedItems[player][category] = { clone }
-end
-
--- Получить первую расу из папок (возвращает имя подпапки)
-local function getFirstRaceName()
-	local raceFolder = ServerStorage:FindFirstChild("Race")
-	if raceFolder then
-		for _, sub in ipairs(raceFolder:GetChildren()) do
-			if sub:IsA("Folder") then
-				return sub.Name
-			end
-		end
-	end
-	return nil
 end
 
 -- Надеть конкретную расу (заменяет текущую)
@@ -168,6 +186,22 @@ local function applyRace(player, raceName)
 		local clone = item:Clone()
 		clone:SetAttribute("RaceName", raceName)
 		clone.Parent = char
+	end
+
+	-- Возвращаем расе последний выбранный цвет (иначе смена расы сбрасывает цвет)
+	local storedColor = categoryColors[player] and categoryColors[player]["Race"]
+	if storedColor then
+		for _, child in ipairs(char:GetChildren()) do
+			if child:GetAttribute("RaceName") then
+				local parts = child:GetDescendants()
+				if child:IsA("BasePart") then table.insert(parts, child) end
+				for _, desc in ipairs(parts) do
+					if desc:IsA("BasePart") then
+						desc.Color = storedColor
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -340,6 +374,7 @@ end)
 Players.PlayerRemoving:Connect(function(player)
 	-- очистка
 	equippedItems[player] = nil
+	categoryColors[player] = nil
 	_G.PlayerSkinColors[player] = nil
 end)
 
@@ -370,6 +405,17 @@ end
 
 -- Экипировка / снятие
 equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
+	-- Белый список категорий (иначе, например, FireServer("Gender","Male")
+	-- клонирует в персонажа целый риг из ServerStorage.Gender)
+	if typeof(categoryName) ~= "string" or not VALID_EQUIP_CATEGORIES[categoryName] then
+		warn("EquipItem: неизвестная категория " .. tostring(categoryName) .. " от " .. player.Name)
+		return
+	end
+	if itemName ~= nil and typeof(itemName) ~= "string" then
+		warn("EquipItem: некорректное имя предмета от " .. player.Name)
+		return
+	end
+
 	print("?? Запрос от", player.Name, "категория:", categoryName, "предмет:", itemName)
 
 	-- Защита от снятия обязательных категорий
@@ -440,6 +486,15 @@ end)
 
 -- Изменение цвета
 changeColorEvent.OnServerEvent:Connect(function(player, category, color)
+	-- Валидация: без неё не-Color3 значение роняет обработчик (частичная перекраска, спам ошибок)
+	if typeof(category) ~= "string" or (not VALID_EQUIP_CATEGORIES[category] and category ~= "Skin") then
+		warn("ChangePartColorEvent: неизвестная категория " .. tostring(category))
+		return
+	end
+	if typeof(color) ~= "Color3" then
+		warn("ChangePartColorEvent: ожидался Color3, получено " .. typeof(color))
+		return
+	end
 	applyCategoryColor(player, category, color)
 end)
 
@@ -447,4 +502,29 @@ end)
 local getSkinColorFunction = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
 getSkinColorFunction.OnServerInvoke = function(player)
 	return _G.PlayerSkinColors[player]   -- вернёт nil, если ещё не установлен
+end
+
+-- Снимок надетых предметов и выбранных цветов. Клиент запрашивает его при
+-- инициализации: подтверждения экипировки со спавна он не получил (подключился позже)
+getEquippedFunction.OnServerInvoke = function(player)
+	local equipped = {}
+	local eq = equippedItems[player]
+	if eq then
+		for category, items in pairs(eq) do
+			if items and #items > 0 then
+				equipped[category] = items[1].Name
+			end
+		end
+	end
+
+	local colors = {}
+	for category, color in pairs(categoryColors[player] or {}) do
+		colors[category] = color
+	end
+	-- Кожа хранится в _G (могут писать и другие серверные скрипты) - она приоритетна
+	if _G.PlayerSkinColors[player] then
+		colors.Skin = _G.PlayerSkinColors[player]
+	end
+
+	return equipped, colors
 end

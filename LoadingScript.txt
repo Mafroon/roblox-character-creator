@@ -25,7 +25,15 @@ if not playerGui then return end
 
 ReplicatedFirst:RemoveDefaultLoadingScreen()
 
-local loadingGui = ReplicatedFirst:WaitForChild("LoadingScreen", 10):Clone()
+-- Если шаблона нет — просто пропускаем экран загрузки, но не ломаем сессию:
+-- иначе StartGameEvent не сработает и SceneTransition будет ждать вечно
+local loadingTemplate = ReplicatedFirst:WaitForChild("LoadingScreen", 10)
+if not loadingTemplate then
+	warn("Шаблон LoadingScreen не найден - запускаем игру без экрана загрузки")
+	startGameEvent:Fire()
+	return
+end
+local loadingGui = loadingTemplate:Clone()
 loadingGui.Parent = playerGui
 
 -- скрываем другие GUI
@@ -41,19 +49,37 @@ local guiBlocker = playerGui.ChildAdded:Connect(function(child)
 	end
 end)
 
+-- Аварийное завершение: снимаем блокировку GUI и всё равно запускаем игру.
+-- Нельзя просто return: guiBlocker остался бы навсегда и "убил" бы всю сессию.
+local function abortLoadingScreen(reason)
+	warn("Экран загрузки прерван: " .. reason)
+	guiBlocker:Disconnect()
+	for _, gui in playerGui:GetChildren() do
+		if gui:IsA("ScreenGui") and gui ~= loadingGui then
+			gui.Enabled = true
+		end
+	end
+	startGameEvent:Fire()
+	loadingGui:Destroy()
+end
+
 local backFrame = loadingGui:WaitForChild("BackFrame", 5)
 local continueFrame = backFrame and backFrame:WaitForChild("ContinueFrame", 5)
-if not continueFrame then return end
+if not continueFrame then return abortLoadingScreen("ContinueFrame не найден") end
 continueFrame.Position = UDim2.new(0.5, 0, 1.1, 0)
 
 local line = backFrame:WaitForChild("Line", 5)
-if not line then return end
+if not line then return abortLoadingScreen("Line не найден") end
 line.Rotation = 90
 line.Size = UDim2.new(1, 0, 0, 0)
 
-local draftFrame = backFrame:WaitForChild("Names", 5):WaitForChild("Name", 5):WaitForChild("Draft", 5)
+-- Цепочка разбита на шаги: chained WaitForChild на nil-промежуточном падает с ошибкой
+local namesFrame = backFrame:WaitForChild("Names", 5)
+local nameFrame = namesFrame and namesFrame:WaitForChild("Name", 5)
+local draftFrame = nameFrame and nameFrame:WaitForChild("Draft", 5)
+if not draftFrame then return abortLoadingScreen("Draft не найден") end
 local gradient = draftFrame:WaitForChild("UIGradient", 5)
-if not gradient then return end
+if not gradient then return abortLoadingScreen("UIGradient не найден") end
 
 local accumulatedTime = 0
 local renderConnection = RunService.RenderStepped:Connect(function(dt)
@@ -78,7 +104,10 @@ TweenService:Create(line, showInfo, {Size = UDim2.new(1, 0, FINAL_HEIGHT, 0)}):P
 TweenService:Create(continueFrame, showInfo, {Position = UDim2.new(0.5, 0, 0.77, 0)}):Play()
 
 local continueButton = continueFrame:WaitForChild("ContinueButton", 5)
-if continueButton then continueButton.MouseButton1Click:Wait() end
+if continueButton then
+	-- Activated покрывает мышь, тач и геймпад (MouseButton1Click - только мышь)
+	continueButton.Activated:Wait()
+end
 
 guiBlocker:Disconnect()
 startGameEvent:Fire()

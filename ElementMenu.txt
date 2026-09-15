@@ -30,14 +30,23 @@ local currentInfoFrame = nil    -- какой фрейм открыт сейчас
 local isInfoAnimating = false
 
 -- ===================== АНИМАЦИЯ ИНФО-ФРЕЙМОВ =====================
+-- ВАЖНО: TweenBase.Completed срабатывает и при отмене твина (PlaybackState.Cancelled),
+-- например когда переход прерывает анимацию через closeOpenInfoFrame. Поэтому
+-- состояние фиксируем только при реальном завершении, а при отмене лишь
+-- снимаем флаг анимации, чтобы кнопки стихий не "залипли".
+
 local function closeInfoFrame(infoFrame, callback)
 	local tween = TweenService:Create(infoFrame,
 		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = INFO_HIDE_POS})
 	tween:Play()
-	tween.Completed:Connect(function()
-		infoFrame.Visible = false
-		if callback then callback() end
+	tween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			infoFrame.Visible = false
+			if callback then callback() end
+		else
+			isInfoAnimating = false
+		end
 	end)
 end
 
@@ -48,9 +57,14 @@ local function showInfoFrame(infoFrame, callback)
 		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = INFO_SHOW_POS})
 	tween:Play()
-	if callback then
-		tween.Completed:Connect(callback)
-	end
+	tween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			if callback then callback() end
+		else
+			-- Фрейм прерван переходом: НЕ считаем его открытым
+			isInfoAnimating = false
+		end
+	end)
 end
 
 -- Обработчик нажатия на кнопку стихии (открыть/закрыть/переключить)

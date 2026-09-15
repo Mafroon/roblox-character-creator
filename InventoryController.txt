@@ -15,6 +15,7 @@ local InventoryController = {}
 -- ===================== REMOTE ОБЪЕКТЫ И ШАБЛОНЫ =====================
 local GetInventoryItems = ReplicatedStorage:WaitForChild("GetInventoryItems")
 local EquipItemEvent = ReplicatedStorage:WaitForChild("EquipItem")
+local GetEquippedItems = ReplicatedStorage:WaitForChild("GetEquippedItems") -- RemoteFunction: снимок надетого
 local ChangePartColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
 local GetPlayerSkinColor = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
 local ColorPickerModule = require(ReplicatedStorage:WaitForChild("ColorPicker"))
@@ -71,6 +72,8 @@ local currentCategoryColors = {
 local skinColorFrame = nil          -- квадратик предпросмотра цвета кожи
 local categoryItemCache = {}        -- кэш предметов для рандомайзера
 local equipTextLabels = {}          -- [категория] = TextLabel с названием предмета
+local lastEquipClickTime = 0        -- защита от двойного клика (тоггл "надеть-снять" туда-обратно)
+local lastRandomTime = 0            -- защита от спама кнопкой рандомайзера
 
 -- ===================== ЗАКРЫТИЕ ИНВЕНТАРЕЙ =====================
 local function closeAllInventories()
@@ -108,6 +111,11 @@ local function populateInventory(inventoryFrame, categoryName)
 		local button = itemClone:FindFirstChild("ImageButton")
 		if button then
 			button.Activated:Connect(function()
+				-- Дебаунс: быстрый двойной клик успевает отправить "надеть" и "снять" подряд
+				local now = os.clock()
+				if now - lastEquipClickTime < 0.25 then return end
+				lastEquipClickTime = now
+
 				local equippedName = currentEquipped[categoryName]
 				if equippedName == itemData.name then
 					EquipItemEvent:FireServer(categoryName, nil)
@@ -344,6 +352,11 @@ function InventoryController.init(deps)
 
 	local randomButton = creationGui:WaitForChild("Random"):WaitForChild("Frame"):WaitForChild("RandomButton")
 	randomButton.MouseButton1Click:Connect(function()
+		-- Дебаунс: один клик и так шлёт ~12 запросов на сервер
+		local now = os.clock()
+		if now - lastRandomTime < 0.5 then return end
+		lastRandomTime = now
+
 		closeAllInventories()
 
 		-- Обязательные категории (всегда новые предметы)
@@ -364,12 +377,17 @@ function InventoryController.init(deps)
 		}
 		for _, opt in ipairs(optional) do
 			local items = categoryItemCache[opt.name]
-			if items and #items > 0 and rng:NextNumber() < opt.chance then
-				local chosen = items[rng:NextInteger(1, #items)]
-				EquipItemEvent:FireServer(opt.name, chosen.name)
-			else
-				EquipItemEvent:FireServer(opt.name, nil)
+			if items and #items > 0 then
+				if rng:NextNumber() < opt.chance then
+					local chosen = items[rng:NextInteger(1, #items)]
+					EquipItemEvent:FireServer(opt.name, chosen.name)
+				else
+					-- Снимаем только когда категория известна и предмет реально не выпал
+					EquipItemEvent:FireServer(opt.name, nil)
+				end
 			end
+			-- Пустой кэш (нет предметов/не догрузился): пропускаем, чтобы
+			-- не снимать вручную надетый предмет категории
 		end
 
 		-- Применяем цвета
@@ -408,6 +426,26 @@ function InventoryController.init(deps)
 		currentEquipped[data.category] = data.item
 		updateEquipText(data.category, data.item)
 	end)
+
+	-- Синхронизация с сервером: случайный набор выдаётся на спавне, когда клиент
+	-- ещё не подключён к EquipItem, поэтому все подтверждения спавна потеряны.
+	-- Запрашиваем снимок надетого и выбранных цветов, иначе первый клик по уже
+	-- надетому предмету работает "наоборот" (снимает вместо показа надетого).
+	local initialEquipped, initialColors = GetEquippedItems:InvokeServer()
+	if initialEquipped then
+		for category, itemName in pairs(initialEquipped) do
+			currentEquipped[category] = itemName
+			updateEquipText(category, itemName)
+		end
+	end
+	if initialColors then
+		for category, color in pairs(initialColors) do
+			currentCategoryColors[category] = color
+		end
+		if initialColors.Skin then
+			skinColorFrame.BackgroundColor3 = initialColors.Skin
+		end
+	end
 end
 
 return InventoryController

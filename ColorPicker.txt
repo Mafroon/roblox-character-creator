@@ -91,7 +91,9 @@ function ColorPicker:_bindEvents()
 		local conn1 = slider.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				holding = true
-				while holding do
+				-- ѕровер€ем _isDestroyed: Destroy() отключает InputEnded,
+				-- и без этой проверки цикл крутилс€ бы каждый кадр вечно
+				while holding and not self._isDestroyed do
 					local relX = math.clamp(mouse.X - slider.AbsolutePosition.X, 0, slider.AbsoluteSize.X)
 					self["_"..component] = relX / slider.AbsoluteSize.X
 					self:UpdateUI()

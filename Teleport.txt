@@ -29,7 +29,23 @@ local function teleportPlayer(player, chosenElement)
 end
 
 -- —лушаем запрос от клиента
+-- Ѕелый список стихий: должен совпадать с элементами меню выбора
+-- (HoverBorder2.ELEMENT_CONFIG / ElementMenu.ELEMENTS), иначе в принимающий
+-- плейс уйдут произвольные данные от клиента
+local VALID_ELEMENTS = {
+	Fire = true,
+	Water = true,
+	Earth = true,
+	Air = true,
+	Light = true,
+	Gloom = true,
+}
+
 teleportEvent.OnServerEvent:Connect(function(player, chosenElement)
+	if typeof(chosenElement) ~= "string" or not VALID_ELEMENTS[chosenElement] then
+		warn("“елепортаци€ отклонена: неизвестна€ стихи€ " .. tostring(chosenElement) .. " от " .. player.Name)
+		return
+	end
 	print("ѕолучен запрос на телепортацию от " .. player.Name .. " со стихией " .. chosenElement)
 	teleportPlayer(player, chosenElement)
 end)
