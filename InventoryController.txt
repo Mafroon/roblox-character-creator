@@ -153,7 +153,10 @@ local function openColorPicker(palette, categoryName, parentInventory)
 			colorPickers[palette] = nil
 		end
 		palette.Visible = false
-		currentOpenInventory = nil
+		-- Палитра закрывается, а родительский инвентарь остаётся открытым:
+		-- он снова становится текущим окном. Иначе следующий клик по кнопке
+		-- категории переоткроет инвентарь вместо того, чтобы его закрыть
+		currentOpenInventory = parentInventory or nil
 		print("Палитра закрыта: " .. palette.Name)
 		return
 	end
@@ -178,8 +181,13 @@ local function openColorPicker(palette, categoryName, parentInventory)
 
 	local function onClosed()
 		palette.Visible = false
+		-- Accept/Cancel закрывает только палитру, родительский инвентарь
+		-- остаётся на экране. Возвращаем ему статус текущего окна, иначе
+		-- состояние ("ничего не открыто") расходится с экраном: следующий
+		-- клик по кнопке категории печатал "Открыт", а окно не закрывалось,
+		-- и закрыть его получалось только со второго раза
 		if currentOpenInventory == palette then
-			currentOpenInventory = nil
+			currentOpenInventory = parentInventory or nil
 		end
 		if colorPickers[palette] == picker then
 			colorPickers[palette] = nil

@@ -92,5 +92,14 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 		print("÷вет кожи восстановлен после смены пола")
 	end
 
+	-- 5. «амена торсов через ReplaceBodyPartR15 пересобирает Motor6D и может
+	-- остановить игравший idle-трек - перезапускаем его, иначе персонаж
+	-- застывает "стойкой смирно" после смены пола
+	if _G.ReplayCharacterIdle then
+		_G.ReplayCharacterIdle(character)
+	else
+		warn("MaleFemale: _G.ReplayCharacterIdle недоступен - обновите скрипт ReplaceAvatarWithRig из ReplaceAvatarWithRig.txt")
+	end
+
 	print("ѕол игрока " .. player.Name .. " изменЄн на " .. gender)
 end)

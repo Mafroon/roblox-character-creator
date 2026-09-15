@@ -292,6 +292,17 @@ local function applyRandomOutfit(player)
 			end
 		end
 	end
+	-- Перезапускаем idle после экипировки: спавн и одежда идут в один момент,
+	-- и трек, запущенный во время передачи владения персонажем клиенту, может
+	-- не отобразиться (тот же механизм, что в ReplaceAvatarWithRig)
+	if _G.ReplayCharacterIdle then
+		task.delay(1, function()
+			if char.Parent then
+				_G.ReplayCharacterIdle(char)
+			end
+		end)
+	end
+
 	print("<<< applyRandomOutfit завершена")
 end
 

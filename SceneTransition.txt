@@ -30,7 +30,11 @@ local mainMenu = playerGui:WaitForChild("MainMenuGui")
 local creationGui = playerGui:WaitForChild("CreationMenuGui")
 
 mainMenu.Enabled = true
-creationGui.Enabled = true
+-- CreationMenuGui включаем только после инициализации модулей и скрытия
+-- панелей (ниже): InventoryController.init делает серию InvokeServer-запросов,
+-- и если включить GUI сейчас, всё это время игрок видит редактор целиком
+-- (мерцание интерфейса после кнопки Continue)
+creationGui.Enabled = false
 
 -- ===================== МОДУЛИ =====================
 local SceneEffects = require(ReplicatedStorage:WaitForChild("SceneEffects"))
@@ -109,6 +113,10 @@ customizeText.Visible = false
 leftRight.Visible = false
 randomFrame.Visible = false
 elementMenu.Enabled = false
+-- Панели спрятаны до включения GUI: включаем только теперь, иначе после
+-- Continue редактор успевает вспыхнуть на экране до того, как панели
+-- уедут на стартовые позиции за пределы экрана
+creationGui.Enabled = true
 
 -- ===================== СМЕНА ПОЛА =====================
 local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")

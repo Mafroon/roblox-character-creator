@@ -13,7 +13,56 @@ local femaleRig = genderFolder:WaitForChild("Female")
 local spawnPosition = Vector3.new(10, 0, 0)
 local spawnRotation = CFrame.Angles(0, math.rad(90), 0)
 
-local idleAnimation = ServerStorage:FindFirstChild("Animations") and ServerStorage.Animations:FindFirstChild("Idle")
+-- Idle-анимаци€ ищетс€ при каждом спавне, а не один раз при старте скрипта:
+-- раньше FindFirstChild молча пропускал анимацию (нет папки, переименована,
+-- пустой AnimationId), и персонаж замирал "стойкой смирно" без объ€снений
+local function findIdleAnimation()
+	local folder = ServerStorage:FindFirstChild("Animations")
+	if not folder then
+		warn("ReplaceAvatarWithRig: в ServerStorage нет папки 'Animations' - персонаж будет сто€ть без idle-анимации")
+		return nil
+	end
+	local idle = folder:FindFirstChild("Idle")
+	if not idle then
+		warn("ReplaceAvatarWithRig: в ServerStorage.Animations нет объекта 'Idle' - персонаж будет сто€ть без idle-анимации")
+		return nil
+	end
+	if not idle:IsA("Animation") then
+		warn("ReplaceAvatarWithRig: ServerStorage.Animations.Idle не €вл€етс€ Animation - idle не сыграет")
+		return nil
+	end
+	if idle.AnimationId == "" then
+		warn("ReplaceAvatarWithRig: у ServerStorage.Animations.Idle пустой AnimationId - idle не сыграет")
+		return nil
+	end
+	return idle
+end
+
+-- ѕроигрывает idle заново, останавлива€ уже идущие треки. ¬ынесено в _G дл€
+-- серверных скриптов, которые трогают части тела: MaleFemale после
+-- ReplaceBodyPartR15 перезапускает idle этим вызовом
+function _G.ReplayCharacterIdle(character)
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	local idle = findIdleAnimation()
+	if not idle then return end
+
+	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+	animator.Parent = humanoid
+	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+		track:Stop(0.1)
+	end
+	local ok, err = pcall(function()
+		local idleTrack = animator:LoadAnimation(idle)
+		idleTrack.Looped = true
+		idleTrack:Play()
+	end)
+	if ok then
+		print(" астомна€ idle-анимаци€ дл€ " .. character.Name)
+	else
+		warn("ReplaceAvatarWithRig: не удалось запустить idle-анимацию: " .. tostring(err))
+	end
+end
 
 local rng = Random.new()
 
@@ -24,6 +73,15 @@ local function spawnPlayer(player)
 
 	local rig = rigTemplate:Clone()
 	rig.Name = player.Name .. "_CustomAvatar"
+
+	-- Animator создаЄм ƒќ первого парента рига: треки реплицируютс€ через
+	-- Animator, и если клиент впервые видит персонажа ещЄ без него, запущенный
+	-- сервером idle может не доехать (персонаж замирал до смены пола)
+	local humanoidEarly = rig:FindFirstChildOfClass("Humanoid")
+	if humanoidEarly and not humanoidEarly:FindFirstChildOfClass("Animator") then
+		Instance.new("Animator").Parent = humanoidEarly
+	end
+
 	rig.Parent = workspace
 
 	-- ѕозиционируем риг
@@ -63,15 +121,15 @@ local function spawnPlayer(player)
 
 	print("«аспавнен " .. chosenGender .. " персонаж дл€ " .. player.Name)
 
-	-- ѕроигрываем idle-анимацию
-	if idleAnimation and humanoid then
-		local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
-		animator.Parent = humanoid
-		local idleTrack = animator:LoadAnimation(idleAnimation)
-		idleTrack.Looped = true
-		idleTrack:Play()
-		print(" астомна€ idle-анимаци€ дл€ " .. player.Name)
-	end
+	-- ѕроигрываем idle-анимацию. «адержка не случайна: в момент присвоени€
+	-- player.Character клиент забирает владение ригом, и трек, запущенный
+	-- сервером в это же окно, до клиента доезжает не всегда (поэтому персонаж
+	-- "оживал" только после смены пола - там тот же трек запускалс€ позже)
+	task.delay(0.5, function()
+		if rig.Parent then
+			_G.ReplayCharacterIdle(rig)
+		end
+	end)
 end
 
 Players.PlayerAdded:Connect(spawnPlayer)

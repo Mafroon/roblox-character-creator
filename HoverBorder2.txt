@@ -11,12 +11,21 @@
 	У RemoteEvent нет ни .Event, ни :Fire(), код с RemoteEvent упал бы при старте.
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local elementMenu = playerGui:WaitForChild("ElementMenuGui")
 
-local lastClickTime = 0
-local DEBOUNCE_TIME = 0.3   -- можно менять
+-- Модуль ElementMenu обслуживает инфо-фреймы тех же кнопок стихий.
+-- Берём у него общий гейт кликов: если этот скрипт и модуль фильтруют клики
+-- по отдельности, при спаме "Ваш выбор" и описание стихии разъезжаются
+-- (видно описание одной стихии, а выбор - другой)
+local ElementMenuModule = require(ReplicatedStorage:WaitForChild("ElementMenu"))
+
+if not ElementMenuModule.onElementToggled or not ElementMenuModule.isClickAllowed then
+	warn("HoverBorder2: модуль ElementMenu в ReplicatedStorage устарел (нет onElementToggled/isClickAllowed). "
+		.. "Замените его тело содержимым ElementMenu.txt - без этого выбор стихии и кнопка Play не работают!")
+end
 
 local function brightenColor(color: Color3, factor: number): Color3
 	local h, s, v = color:ToHSV()
@@ -132,34 +141,31 @@ local function updateChoiceLabel(button: GuiButton?)
 	end
 end
 
-local function toggleSelection(button: GuiButton)
-	local now = tick()
-	if now - lastClickTime < DEBOUNCE_TIME then
-		return   -- игнорируем слишком быстрый повтор
-	end
-	lastClickTime = now
-
-	local highlight = setupElementButton(button)
-	if not highlight then return end
-
-	if selectedButton == button then
-		-- Снимаем выделение
-		highlight.deselect()
-		selectedButton = nil
-		updateChoiceLabel(nil)
-	else
-		-- Снимаем выделение с предыдущей
-		if selectedButton then
-			local prevHighlight = buttonHighlights[selectedButton]
-			if prevHighlight then
-				prevHighlight.deselect()
+-- ===== ВЫБОР СТИХИЙ =====
+-- Кнопки стихий подключает модуль ElementMenu (он же открывает инфо-фреймы).
+-- Сюда приходит готовое решение: (кнопка, выбрана/снята) - и подсветка, и
+-- "Ваш выбор", и описание стихии живут по одному решению. Раньше у этого
+-- скрипта был собственный обработчик с отдельным фильтром кликов, и из-за
+-- расхождения фильтров выбор мог теряться молча.
+if ElementMenuModule.onElementToggled then
+	ElementMenuModule.onElementToggled(function(button, isSelected)
+		if isSelected then
+			if selectedButton and selectedButton ~= button and buttonHighlights[selectedButton] then
+				buttonHighlights[selectedButton].deselect()
 			end
+			local highlight = setupElementButton(button)
+			if highlight then
+				highlight.select()
+				selectedButton = button
+			end
+		else
+			if selectedButton and buttonHighlights[selectedButton] then
+				buttonHighlights[selectedButton].deselect()
+			end
+			selectedButton = nil
 		end
-		-- Выделяем новую
-		highlight.select()
-		selectedButton = button
-		updateChoiceLabel(button)
-	end
+		updateChoiceLabel(isSelected and button or nil)
+	end)
 end
 
 local function deselectAllButtons()
@@ -174,21 +180,8 @@ local function deselectAllButtons()
 	end
 end
 
--- ===== ПОДКЛЮЧЕНИЕ КНОПОК =====
-local function connectElementButton(button: GuiButton)
-	local config = ELEMENT_CONFIG[button.Name]
-	if config then
-		-- Настраиваем hover/подсветку один раз
-		setupElementButton(button)
-		-- Подключаем клик
-		button.Activated:Connect(function()
-			toggleSelection(button)
-		end)
-	end
-end
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- BindableEvent (клиент->клиент): у RemoteEvent нет .Event и :Fire()
+-- (ReplicatedStorage объявлен в начале скрипта)
 local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
 resetChoiceEvent.Event:Connect(deselectAllButtons)
 
@@ -196,8 +189,9 @@ resetChoiceEvent.Event:Connect(deselectAllButtons)
 if elementMenu then
 	local function scan(parent: Instance)
 		for _, child in ipairs(parent:GetChildren()) do
+			-- Только hover-подсветка: сами клики подключает ElementMenu
 			if child:IsA("GuiButton") and ELEMENT_CONFIG[child.Name] then
-				connectElementButton(child)
+				setupElementButton(child)
 			end
 			scan(child)
 		end
@@ -228,6 +222,8 @@ local chosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
 if playButton then
 	playButton.Activated:Connect(function()
+		-- На время переходов и анимаций инфо-фреймов Play заблокирован
+		if not ElementMenuModule.isClickAllowed() then return end
 		if selectedButton then
 			local config = ELEMENT_CONFIG[selectedButton.Name]
 			if config then

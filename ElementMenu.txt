@@ -6,6 +6,11 @@
 	Отвечает за информационные фреймы стихий (Fire, Water, Earth, Air,
 	Light, Gloom) в ElementMenuGui: показ/скрытие по клику на кнопку
 	стихии и принудительное закрытие при переходах.
+
+	Единственный обработчик кликов по кнопкам стихий: HoverBorder2 больше
+	не подключает эти кнопки сам, а подписывается на готовое решение через
+	ElementMenu.onElementToggled (иначе у двух скриптов расходились фильтры
+	кликов и "Ваш выбор" оставался пустым).
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -32,6 +37,44 @@ local isInfoAnimating = false
 -- ElementMenuGui только через 0.8с, и без этого флага клик в этом окне
 -- успевает переоткрыть инфо-фрейм, который переход только что закрыл
 local inputEnabled = true
+
+-- ============ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК КЛИКОВ ПО КНОПКАМ СТИХИЙ ============
+-- Кнопки стихий обслуживает ТОЛЬКО этот модуль: он решает, принят ли клик
+-- (переходы, анимация инфо-фрейма, анти-спам 0.3с), и открывает инфо-фрейм.
+-- HoverBorder2 своих обработчиков на эти кнопки больше не вешает - он
+-- подписывается через onElementToggled и получает готовое решение, поэтому
+-- "Ваш выбор" физически не может разойтись с описанием стихии.
+local CLICK_DEBOUNCE = 0.3        -- сек между принимаемыми кликами
+local lastAcceptedClickTime = 0
+local toggleListeners = {}        -- подписчики (HoverBorder2) на решение о выборе
+
+-- Подписка на решение о выборе: listener(button, isSelected)
+function ElementMenu.onElementToggled(listener)
+	table.insert(toggleListeners, listener)
+end
+
+-- Клик разрешён, но не расходует дебаунс (для PlayButton во время переходов)
+function ElementMenu.isClickAllowed()
+	return inputEnabled and not isInfoAnimating
+end
+
+-- Внутренний гейт: решать, принимать ли клик по кнопке стихии
+local function acquireClick()
+	local now = os.clock()
+	if not inputEnabled then
+		warn("ElementMenu: клик отклонён - идёт переход (inputEnabled=false)")
+		return false
+	end
+	if isInfoAnimating then
+		warn("ElementMenu: клик отклонён - инфо-фрейм ещё анимируется")
+		return false
+	end
+	if now - lastAcceptedClickTime < CLICK_DEBOUNCE then
+		return false -- анти-спам: слишком быстро, молча игнорируем
+	end
+	lastAcceptedClickTime = now
+	return true
+end
 
 -- ===================== АНИМАЦИЯ ИНФО-ФРЕЙМОВ =====================
 -- ВАЖНО: TweenBase.Completed срабатывает и при отмене твина (PlaybackState.Cancelled),
@@ -76,17 +119,19 @@ local function showInfoFrame(infoFrame, callback)
 end
 
 -- Обработчик нажатия на кнопку стихии (открыть/закрыть/переключить)
-local function onElementButtonClicked(infoFrame)
-	if not inputEnabled then return end
-	if isInfoAnimating then return end
+local function onElementButtonClicked(button, infoFrame)
+	if not acquireClick() then return end
 
+	local selecting
 	if currentInfoFrame == infoFrame then
+		selecting = false
 		isInfoAnimating = true
 		closeInfoFrame(infoFrame, function()
 			currentInfoFrame = nil
 			isInfoAnimating = false
 		end)
 	else
+		selecting = true
 		isInfoAnimating = true
 		local previous = currentInfoFrame
 		local function openNew()
@@ -100,6 +145,13 @@ local function onElementButtonClicked(infoFrame)
 		else
 			openNew()
 		end
+	end
+
+	-- Одно решение на всех: и инфо-фрейм, и подписчики (подсветка +
+	-- "Ваш выбор" в HoverBorder2) живут по нему
+	print("ElementMenu: " .. infoFrame.Name .. " -> " .. (selecting and "выбрана" or "снята"))
+	for _, listener in ipairs(toggleListeners) do
+		listener(button, selecting)
 	end
 end
 
@@ -140,9 +192,10 @@ function ElementMenu.init(deps)
 		if not button then
 			warn("Кнопка " .. element.button .. " не найдена в ElementMenuGui!")
 		else
-			-- Activated: как в HoverBorder2 для тех же кнопок (работает и с геймпадом)
+			-- Единственная точка клика по кнопке стихии; Activated работает
+			-- и с геймпадом (HoverBorder2 получает решение через onElementToggled)
 			button.Activated:Connect(function()
-				onElementButtonClicked(infoFrame)
+				onElementButtonClicked(button, infoFrame)
 			end)
 		end
 	end
