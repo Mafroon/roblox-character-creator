@@ -1,11 +1,11 @@
--- Кастомный спавн персонажа (ServerScriptService)
+-- РљР°СЃС‚РѕРјРЅС‹Р№ СЃРїР°РІРЅ РїРµСЂСЃРѕРЅР°Р¶Р° (ServerScriptService)
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 Players.CharacterAutoLoads = false
 
--- Папки с готовыми моделями полов
+-- РџР°РїРєРё СЃ РіРѕС‚РѕРІС‹РјРё РјРѕРґРµР»СЏРјРё РїРѕР»РѕРІ
 local genderFolder = ServerStorage:WaitForChild("Gender")
 local maleRig = genderFolder:WaitForChild("Male")
 local femaleRig = genderFolder:WaitForChild("Female")
@@ -13,34 +13,34 @@ local femaleRig = genderFolder:WaitForChild("Female")
 local spawnPosition = Vector3.new(10, 0, 0)
 local spawnRotation = CFrame.Angles(0, math.rad(90), 0)
 
--- Idle-анимация ищется при каждом спавне, а не один раз при старте скрипта:
--- раньше FindFirstChild молча пропускал анимацию (нет папки, переименована,
--- пустой AnimationId), и персонаж замирал "стойкой смирно" без объяснений
+-- Idle-Р°РЅРёРјР°С†РёСЏ РёС‰РµС‚СЃСЏ РїСЂРё РєР°Р¶РґРѕРј СЃРїР°РІРЅРµ, Р° РЅРµ РѕРґРёРЅ СЂР°Р· РїСЂРё СЃС‚Р°СЂС‚Рµ СЃРєСЂРёРїС‚Р°:
+-- СЂР°РЅСЊС€Рµ FindFirstChild РјРѕР»С‡Р° РїСЂРѕРїСѓСЃРєР°Р» Р°РЅРёРјР°С†РёСЋ (РЅРµС‚ РїР°РїРєРё, РїРµСЂРµРёРјРµРЅРѕРІР°РЅР°,
+-- РїСѓСЃС‚РѕР№ AnimationId), Рё РїРµСЂСЃРѕРЅР°Р¶ Р·Р°РјРёСЂР°Р» "СЃС‚РѕР№РєРѕР№ СЃРјРёСЂРЅРѕ" Р±РµР· РѕР±СЉСЏСЃРЅРµРЅРёР№
 local function findIdleAnimation()
 	local folder = ServerStorage:FindFirstChild("Animations")
 	if not folder then
-		warn("ReplaceAvatarWithRig: в ServerStorage нет папки 'Animations' - персонаж будет стоять без idle-анимации")
+		warn("ReplaceAvatarWithRig: РІ ServerStorage РЅРµС‚ РїР°РїРєРё 'Animations' - РїРµСЂСЃРѕРЅР°Р¶ Р±СѓРґРµС‚ СЃС‚РѕСЏС‚СЊ Р±РµР· idle-Р°РЅРёРјР°С†РёРё")
 		return nil
 	end
 	local idle = folder:FindFirstChild("Idle")
 	if not idle then
-		warn("ReplaceAvatarWithRig: в ServerStorage.Animations нет объекта 'Idle' - персонаж будет стоять без idle-анимации")
+		warn("ReplaceAvatarWithRig: РІ ServerStorage.Animations РЅРµС‚ РѕР±СЉРµРєС‚Р° 'Idle' - РїРµСЂСЃРѕРЅР°Р¶ Р±СѓРґРµС‚ СЃС‚РѕСЏС‚СЊ Р±РµР· idle-Р°РЅРёРјР°С†РёРё")
 		return nil
 	end
 	if not idle:IsA("Animation") then
-		warn("ReplaceAvatarWithRig: ServerStorage.Animations.Idle не является Animation - idle не сыграет")
+		warn("ReplaceAvatarWithRig: ServerStorage.Animations.Idle РЅРµ СЏРІР»СЏРµС‚СЃСЏ Animation - idle РЅРµ СЃС‹РіСЂР°РµС‚")
 		return nil
 	end
 	if idle.AnimationId == "" then
-		warn("ReplaceAvatarWithRig: у ServerStorage.Animations.Idle пустой AnimationId - idle не сыграет")
+		warn("ReplaceAvatarWithRig: Сѓ ServerStorage.Animations.Idle РїСѓСЃС‚РѕР№ AnimationId - idle РЅРµ СЃС‹РіСЂР°РµС‚")
 		return nil
 	end
 	return idle
 end
 
--- Проигрывает idle заново, останавливая уже идущие треки. Вынесено в _G для
--- серверных скриптов, которые трогают части тела: MaleFemale после
--- ReplaceBodyPartR15 перезапускает idle этим вызовом
+-- РџСЂРѕРёРіСЂС‹РІР°РµС‚ idle Р·Р°РЅРѕРІРѕ, РѕСЃС‚Р°РЅР°РІР»РёРІР°СЏ СѓР¶Рµ РёРґСѓС‰РёРµ С‚СЂРµРєРё. Р’С‹РЅРµСЃРµРЅРѕ РІ _G РґР»СЏ
+-- СЃРµСЂРІРµСЂРЅС‹С… СЃРєСЂРёРїС‚РѕРІ, РєРѕС‚РѕСЂС‹Рµ С‚СЂРѕРіР°СЋС‚ С‡Р°СЃС‚Рё С‚РµР»Р°: MaleFemale РїРѕСЃР»Рµ
+-- ReplaceBodyPartR15 РїРµСЂРµР·Р°РїСѓСЃРєР°РµС‚ idle СЌС‚РёРј РІС‹Р·РѕРІРѕРј
 function _G.ReplayCharacterIdle(character)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
@@ -58,25 +58,25 @@ function _G.ReplayCharacterIdle(character)
 		idleTrack:Play()
 	end)
 	if ok then
-		print("Кастомная idle-анимация для " .. character.Name)
+		print("РљР°СЃС‚РѕРјРЅР°СЏ idle-Р°РЅРёРјР°С†РёСЏ РґР»СЏ " .. character.Name)
 	else
-		warn("ReplaceAvatarWithRig: не удалось запустить idle-анимацию: " .. tostring(err))
+		warn("ReplaceAvatarWithRig: РЅРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ idle-Р°РЅРёРјР°С†РёСЋ: " .. tostring(err))
 	end
 end
 
 local rng = Random.new()
 
 local function spawnPlayer(player)
-	-- 50% шанс получить мужской или женский риг
+	-- 50% С€Р°РЅСЃ РїРѕР»СѓС‡РёС‚СЊ РјСѓР¶СЃРєРѕР№ РёР»Рё Р¶РµРЅСЃРєРёР№ СЂРёРі
 	local chosenGender = if rng:NextNumber() < 0.5 then "male" else "female"
 	local rigTemplate = if chosenGender == "male" then maleRig else femaleRig
 
 	local rig = rigTemplate:Clone()
 	rig.Name = player.Name .. "_CustomAvatar"
 
-	-- Animator создаём ДО первого парента рига: треки реплицируются через
-	-- Animator, и если клиент впервые видит персонажа ещё без него, запущенный
-	-- сервером idle может не доехать (персонаж замирал до смены пола)
+	-- Animator СЃРѕР·РґР°С‘Рј Р”Рћ РїРµСЂРІРѕРіРѕ РїР°СЂРµРЅС‚Р° СЂРёРіР°: С‚СЂРµРєРё СЂРµРїР»РёС†РёСЂСѓСЋС‚СЃСЏ С‡РµСЂРµР·
+	-- Animator, Рё РµСЃР»Рё РєР»РёРµРЅС‚ РІРїРµСЂРІС‹Рµ РІРёРґРёС‚ РїРµСЂСЃРѕРЅР°Р¶Р° РµС‰С‘ Р±РµР· РЅРµРіРѕ, Р·Р°РїСѓС‰РµРЅРЅС‹Р№
+	-- СЃРµСЂРІРµСЂРѕРј idle РјРѕР¶РµС‚ РЅРµ РґРѕРµС…Р°С‚СЊ (РїРµСЂСЃРѕРЅР°Р¶ Р·Р°РјРёСЂР°Р» РґРѕ СЃРјРµРЅС‹ РїРѕР»Р°)
 	local humanoidEarly = rig:FindFirstChildOfClass("Humanoid")
 	if humanoidEarly and not humanoidEarly:FindFirstChildOfClass("Animator") then
 		Instance.new("Animator").Parent = humanoidEarly
@@ -84,17 +84,17 @@ local function spawnPlayer(player)
 
 	rig.Parent = workspace
 
-	-- Позиционируем риг
+	-- РџРѕР·РёС†РёРѕРЅРёСЂСѓРµРј СЂРёРі
 	local rootPart = rig:FindFirstChild("HumanoidRootPart") or rig.PrimaryPart
 	if rootPart then
 		rootPart.Anchored = true
 		rig:PivotTo(CFrame.new(spawnPosition) * spawnRotation)
 	else
-		warn("Риг не имеет HumanoidRootPart или PrimaryPart – пропускаем позиционирование")
+		warn("Р РёРі РЅРµ РёРјРµРµС‚ HumanoidRootPart РёР»Рё PrimaryPart вЂ“ РїСЂРѕРїСѓСЃРєР°РµРј РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅРёРµ")
 		rig:PivotTo(CFrame.new(spawnPosition) * spawnRotation)
 	end
 
-	-- Настраиваем гуманоида
+	-- РќР°СЃС‚СЂР°РёРІР°РµРј РіСѓРјР°РЅРѕРёРґР°
 	local humanoid = rig:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.AutoRotate = false
@@ -106,11 +106,11 @@ local function spawnPlayer(player)
 		humanoid.PlatformStand = false
 	end
 
-	-- Пауза для подписок других скриптов (инвентарь, одежда и т.д.)
+	-- РџР°СѓР·Р° РґР»СЏ РїРѕРґРїРёСЃРѕРє РґСЂСѓРіРёС… СЃРєСЂРёРїС‚РѕРІ (РёРЅРІРµРЅС‚Р°СЂСЊ, РѕРґРµР¶РґР° Рё С‚.Рґ.)
 	task.wait(0.1)
 	player.Character = rig
 
-	-- Сохраняем пол игрока в StringValue, чтобы клиент знал его всегда
+	-- РЎРѕС…СЂР°РЅСЏРµРј РїРѕР» РёРіСЂРѕРєР° РІ StringValue, С‡С‚РѕР±С‹ РєР»РёРµРЅС‚ Р·РЅР°Р» РµРіРѕ РІСЃРµРіРґР°
 	local genderValue = player:FindFirstChild("PlayerGender")
 	if not genderValue then
 		genderValue = Instance.new("StringValue")
@@ -119,12 +119,12 @@ local function spawnPlayer(player)
 	end
 	genderValue.Value = chosenGender
 
-	print("Заспавнен " .. chosenGender .. " персонаж для " .. player.Name)
+	print("Р—Р°СЃРїР°РІРЅРµРЅ " .. chosenGender .. " РїРµСЂСЃРѕРЅР°Р¶ РґР»СЏ " .. player.Name)
 
-	-- Проигрываем idle-анимацию. Задержка не случайна: в момент присвоения
-	-- player.Character клиент забирает владение ригом, и трек, запущенный
-	-- сервером в это же окно, до клиента доезжает не всегда (поэтому персонаж
-	-- "оживал" только после смены пола - там тот же трек запускался позже)
+	-- РџСЂРѕРёРіСЂС‹РІР°РµРј idle-Р°РЅРёРјР°С†РёСЋ. Р—Р°РґРµСЂР¶РєР° РЅРµ СЃР»СѓС‡Р°Р№РЅР°: РІ РјРѕРјРµРЅС‚ РїСЂРёСЃРІРѕРµРЅРёСЏ
+	-- player.Character РєР»РёРµРЅС‚ Р·Р°Р±РёСЂР°РµС‚ РІР»Р°РґРµРЅРёРµ СЂРёРіРѕРј, Рё С‚СЂРµРє, Р·Р°РїСѓС‰РµРЅРЅС‹Р№
+	-- СЃРµСЂРІРµСЂРѕРј РІ СЌС‚Рѕ Р¶Рµ РѕРєРЅРѕ, РґРѕ РєР»РёРµРЅС‚Р° РґРѕРµР·Р¶Р°РµС‚ РЅРµ РІСЃРµРіРґР° (РїРѕСЌС‚РѕРјСѓ РїРµСЂСЃРѕРЅР°Р¶
+	-- "РѕР¶РёРІР°Р»" С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ СЃРјРµРЅС‹ РїРѕР»Р° - С‚Р°Рј С‚РѕС‚ Р¶Рµ С‚СЂРµРє Р·Р°РїСѓСЃРєР°Р»СЃСЏ РїРѕР·Р¶Рµ)
 	task.delay(0.5, function()
 		if rig.Parent then
 			_G.ReplayCharacterIdle(rig)
@@ -134,8 +134,8 @@ end
 
 Players.PlayerAdded:Connect(spawnPlayer)
 
--- Игроки, зашедшие до запуска скрипта (например, в Studio Play Solo):
--- без отката риг для них вообще не создаётся
+-- РРіСЂРѕРєРё, Р·Р°С€РµРґС€РёРµ РґРѕ Р·Р°РїСѓСЃРєР° СЃРєСЂРёРїС‚Р° (РЅР°РїСЂРёРјРµСЂ, РІ Studio Play Solo):
+-- Р±РµР· РѕС‚РєР°С‚Р° СЂРёРі РґР»СЏ РЅРёС… РІРѕРѕР±С‰Рµ РЅРµ СЃРѕР·РґР°С‘С‚СЃСЏ
 for _, player in ipairs(Players:GetPlayers()) do
 	task.spawn(spawnPlayer, player)
 end

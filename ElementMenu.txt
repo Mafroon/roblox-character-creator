@@ -1,27 +1,27 @@
 --[[
-	ElementMenu - клиентский модуль инфо-фреймов стихий.
-	ModuleScript: поместить в ReplicatedStorage с именем "ElementMenu".
-	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+	ElementMenu - РєР»РёРµРЅС‚СЃРєРёР№ РјРѕРґСѓР»СЊ РёРЅС„Рѕ-С„СЂРµР№РјРѕРІ СЃС‚РёС…РёР№.
+	ModuleScript: РїРѕРјРµСЃС‚РёС‚СЊ РІ ReplicatedStorage СЃ РёРјРµРЅРµРј "ElementMenu".
+	РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Р»РѕРєР°Р»СЊРЅС‹Рј СЃРєСЂРёРїС‚РѕРј SceneTransition (СЃРј. SceneTransition.txt).
 
-	Отвечает за информационные фреймы стихий (Fire, Water, Earth, Air,
-	Light, Gloom) в ElementMenuGui: показ/скрытие по клику на кнопку
-	стихии и принудительное закрытие при переходах.
+	РћС‚РІРµС‡Р°РµС‚ Р·Р° РёРЅС„РѕСЂРјР°С†РёРѕРЅРЅС‹Рµ С„СЂРµР№РјС‹ СЃС‚РёС…РёР№ (Fire, Water, Earth, Air,
+	Light, Gloom) РІ ElementMenuGui: РїРѕРєР°Р·/СЃРєСЂС‹С‚РёРµ РїРѕ РєР»РёРєСѓ РЅР° РєРЅРѕРїРєСѓ
+	СЃС‚РёС…РёРё Рё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРµ Р·Р°РєСЂС‹С‚РёРµ РїСЂРё РїРµСЂРµС…РѕРґР°С….
 
-	Единственный обработчик кликов по кнопкам стихий: HoverBorder2 больше
-	не подключает эти кнопки сам, а подписывается на готовое решение через
-	ElementMenu.onElementToggled (иначе у двух скриптов расходились фильтры
-	кликов и "Ваш выбор" оставался пустым).
+	Р•РґРёРЅСЃС‚РІРµРЅРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє РєР»РёРєРѕРІ РїРѕ РєРЅРѕРїРєР°Рј СЃС‚РёС…РёР№: HoverBorder2 Р±РѕР»СЊС€Рµ
+	РЅРµ РїРѕРґРєР»СЋС‡Р°РµС‚ СЌС‚Рё РєРЅРѕРїРєРё СЃР°Рј, Р° РїРѕРґРїРёСЃС‹РІР°РµС‚СЃСЏ РЅР° РіРѕС‚РѕРІРѕРµ СЂРµС€РµРЅРёРµ С‡РµСЂРµР·
+	ElementMenu.onElementToggled (РёРЅР°С‡Рµ Сѓ РґРІСѓС… СЃРєСЂРёРїС‚РѕРІ СЂР°СЃС…РѕРґРёР»РёСЃСЊ С„РёР»СЊС‚СЂС‹
+	РєР»РёРєРѕРІ Рё "Р’Р°С€ РІС‹Р±РѕСЂ" РѕСЃС‚Р°РІР°Р»СЃСЏ РїСѓСЃС‚С‹Рј).
 ]]
 
 local TweenService = game:GetService("TweenService")
 
 local ElementMenu = {}
 
--- Позиции анимации инфо-фреймов
+-- РџРѕР·РёС†РёРё Р°РЅРёРјР°С†РёРё РёРЅС„Рѕ-С„СЂРµР№РјРѕРІ
 local INFO_HIDE_POS = UDim2.new(1.1, 0, 0.4, 0)
 local INFO_SHOW_POS = UDim2.new(0.6, 0, 0.4, 0)
 
--- Список стихий: имена фрейма в InfoFrame и кнопки в ElementMenuGui
+-- РЎРїРёСЃРѕРє СЃС‚РёС…РёР№: РёРјРµРЅР° С„СЂРµР№РјР° РІ InfoFrame Рё РєРЅРѕРїРєРё РІ ElementMenuGui
 local ELEMENTS = {
 	{ infoFrame = "FireInfoFrame",  button = "FireButton" },
 	{ infoFrame = "WaterInfoFrame", button = "WaterButton" },
@@ -31,56 +31,56 @@ local ELEMENTS = {
 	{ infoFrame = "GloomInfoFrame", button = "GloomButton" },
 }
 
-local currentInfoFrame = nil    -- какой фрейм открыт сейчас
+local currentInfoFrame = nil    -- РєР°РєРѕР№ С„СЂРµР№Рј РѕС‚РєСЂС‹С‚ СЃРµР№С‡Р°СЃ
 local isInfoAnimating = false
--- Блокировка кликов на время переходов: SceneEffects.hideElementMenu выключает
--- ElementMenuGui только через 0.8с, и без этого флага клик в этом окне
--- успевает переоткрыть инфо-фрейм, который переход только что закрыл
+-- Р‘Р»РѕРєРёСЂРѕРІРєР° РєР»РёРєРѕРІ РЅР° РІСЂРµРјСЏ РїРµСЂРµС…РѕРґРѕРІ: SceneEffects.hideElementMenu РІС‹РєР»СЋС‡Р°РµС‚
+-- ElementMenuGui С‚РѕР»СЊРєРѕ С‡РµСЂРµР· 0.8СЃ, Рё Р±РµР· СЌС‚РѕРіРѕ С„Р»Р°РіР° РєР»РёРє РІ СЌС‚РѕРј РѕРєРЅРµ
+-- СѓСЃРїРµРІР°РµС‚ РїРµСЂРµРѕС‚РєСЂС‹С‚СЊ РёРЅС„Рѕ-С„СЂРµР№Рј, РєРѕС‚РѕСЂС‹Р№ РїРµСЂРµС…РѕРґ С‚РѕР»СЊРєРѕ С‡С‚Рѕ Р·Р°РєСЂС‹Р»
 local inputEnabled = true
 
--- ============ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК КЛИКОВ ПО КНОПКАМ СТИХИЙ ============
--- Кнопки стихий обслуживает ТОЛЬКО этот модуль: он решает, принят ли клик
--- (переходы, анимация инфо-фрейма, анти-спам 0.3с), и открывает инфо-фрейм.
--- HoverBorder2 своих обработчиков на эти кнопки больше не вешает - он
--- подписывается через onElementToggled и получает готовое решение, поэтому
--- "Ваш выбор" физически не может разойтись с описанием стихии.
-local CLICK_DEBOUNCE = 0.3        -- сек между принимаемыми кликами
+-- ============ Р•Р”РРќРЎРўР’Р•РќРќР«Р™ РћР‘Р РђР‘РћРўР§РРљ РљР›РРљРћР’ РџРћ РљРќРћРџРљРђРњ РЎРўРРҐРР™ ============
+-- РљРЅРѕРїРєРё СЃС‚РёС…РёР№ РѕР±СЃР»СѓР¶РёРІР°РµС‚ РўРћР›Р¬РљРћ СЌС‚РѕС‚ РјРѕРґСѓР»СЊ: РѕРЅ СЂРµС€Р°РµС‚, РїСЂРёРЅСЏС‚ Р»Рё РєР»РёРє
+-- (РїРµСЂРµС…РѕРґС‹, Р°РЅРёРјР°С†РёСЏ РёРЅС„Рѕ-С„СЂРµР№РјР°, Р°РЅС‚Рё-СЃРїР°Рј 0.3СЃ), Рё РѕС‚РєСЂС‹РІР°РµС‚ РёРЅС„Рѕ-С„СЂРµР№Рј.
+-- HoverBorder2 СЃРІРѕРёС… РѕР±СЂР°Р±РѕС‚С‡РёРєРѕРІ РЅР° СЌС‚Рё РєРЅРѕРїРєРё Р±РѕР»СЊС€Рµ РЅРµ РІРµС€Р°РµС‚ - РѕРЅ
+-- РїРѕРґРїРёСЃС‹РІР°РµС‚СЃСЏ С‡РµСЂРµР· onElementToggled Рё РїРѕР»СѓС‡Р°РµС‚ РіРѕС‚РѕРІРѕРµ СЂРµС€РµРЅРёРµ, РїРѕСЌС‚РѕРјСѓ
+-- "Р’Р°С€ РІС‹Р±РѕСЂ" С„РёР·РёС‡РµСЃРєРё РЅРµ РјРѕР¶РµС‚ СЂР°Р·РѕР№С‚РёСЃСЊ СЃ РѕРїРёСЃР°РЅРёРµРј СЃС‚РёС…РёРё.
+local CLICK_DEBOUNCE = 0.3        -- СЃРµРє РјРµР¶РґСѓ РїСЂРёРЅРёРјР°РµРјС‹РјРё РєР»РёРєР°РјРё
 local lastAcceptedClickTime = 0
-local toggleListeners = {}        -- подписчики (HoverBorder2) на решение о выборе
+local toggleListeners = {}        -- РїРѕРґРїРёСЃС‡РёРєРё (HoverBorder2) РЅР° СЂРµС€РµРЅРёРµ Рѕ РІС‹Р±РѕСЂРµ
 
--- Подписка на решение о выборе: listener(button, isSelected)
+-- РџРѕРґРїРёСЃРєР° РЅР° СЂРµС€РµРЅРёРµ Рѕ РІС‹Р±РѕСЂРµ: listener(button, isSelected)
 function ElementMenu.onElementToggled(listener)
 	table.insert(toggleListeners, listener)
 end
 
--- Клик разрешён, но не расходует дебаунс (для PlayButton во время переходов)
+-- РљР»РёРє СЂР°Р·СЂРµС€С‘РЅ, РЅРѕ РЅРµ СЂР°СЃС…РѕРґСѓРµС‚ РґРµР±Р°СѓРЅСЃ (РґР»СЏ PlayButton РІРѕ РІСЂРµРјСЏ РїРµСЂРµС…РѕРґРѕРІ)
 function ElementMenu.isClickAllowed()
 	return inputEnabled and not isInfoAnimating
 end
 
--- Внутренний гейт: решать, принимать ли клик по кнопке стихии
+-- Р’РЅСѓС‚СЂРµРЅРЅРёР№ РіРµР№С‚: СЂРµС€Р°С‚СЊ, РїСЂРёРЅРёРјР°С‚СЊ Р»Рё РєР»РёРє РїРѕ РєРЅРѕРїРєРµ СЃС‚РёС…РёРё
 local function acquireClick()
 	local now = os.clock()
 	if not inputEnabled then
-		warn("ElementMenu: клик отклонён - идёт переход (inputEnabled=false)")
+		warn("ElementMenu: РєР»РёРє РѕС‚РєР»РѕРЅС‘РЅ - РёРґС‘С‚ РїРµСЂРµС…РѕРґ (inputEnabled=false)")
 		return false
 	end
 	if isInfoAnimating then
-		warn("ElementMenu: клик отклонён - инфо-фрейм ещё анимируется")
+		warn("ElementMenu: РєР»РёРє РѕС‚РєР»РѕРЅС‘РЅ - РёРЅС„Рѕ-С„СЂРµР№Рј РµС‰С‘ Р°РЅРёРјРёСЂСѓРµС‚СЃСЏ")
 		return false
 	end
 	if now - lastAcceptedClickTime < CLICK_DEBOUNCE then
-		return false -- анти-спам: слишком быстро, молча игнорируем
+		return false -- Р°РЅС‚Рё-СЃРїР°Рј: СЃР»РёС€РєРѕРј Р±С‹СЃС‚СЂРѕ, РјРѕР»С‡Р° РёРіРЅРѕСЂРёСЂСѓРµРј
 	end
 	lastAcceptedClickTime = now
 	return true
 end
 
--- ===================== АНИМАЦИЯ ИНФО-ФРЕЙМОВ =====================
--- ВАЖНО: TweenBase.Completed срабатывает и при отмене твина (PlaybackState.Cancelled),
--- например когда переход прерывает анимацию через closeOpenInfoFrame. Поэтому
--- состояние фиксируем только при реальном завершении, а при отмене лишь
--- снимаем флаг анимации, чтобы кнопки стихий не "залипли".
+-- ===================== РђРќРРњРђР¦РРЇ РРќР¤Рћ-Р¤Р Р•Р™РњРћР’ =====================
+-- Р’РђР–РќРћ: TweenBase.Completed СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ Рё РїСЂРё РѕС‚РјРµРЅРµ С‚РІРёРЅР° (PlaybackState.Cancelled),
+-- РЅР°РїСЂРёРјРµСЂ РєРѕРіРґР° РїРµСЂРµС…РѕРґ РїСЂРµСЂС‹РІР°РµС‚ Р°РЅРёРјР°С†РёСЋ С‡РµСЂРµР· closeOpenInfoFrame. РџРѕСЌС‚РѕРјСѓ
+-- СЃРѕСЃС‚РѕСЏРЅРёРµ С„РёРєСЃРёСЂСѓРµРј С‚РѕР»СЊРєРѕ РїСЂРё СЂРµР°Р»СЊРЅРѕРј Р·Р°РІРµСЂС€РµРЅРёРё, Р° РїСЂРё РѕС‚РјРµРЅРµ Р»РёС€СЊ
+-- СЃРЅРёРјР°РµРј С„Р»Р°Рі Р°РЅРёРјР°С†РёРё, С‡С‚РѕР±С‹ РєРЅРѕРїРєРё СЃС‚РёС…РёР№ РЅРµ "Р·Р°Р»РёРїР»Рё".
 
 local function closeInfoFrame(infoFrame, callback)
 	local tween = TweenService:Create(infoFrame,
@@ -100,8 +100,8 @@ end
 local function showInfoFrame(infoFrame, callback)
 	infoFrame.Visible = true
 	infoFrame.Position = INFO_HIDE_POS
-	-- Фиксируем сразу, а не в Completed: переход может начаться посреди
-	-- анимации, и closeOpenInfoFrame должен найти фрейм, чтобы его закрыть
+	-- Р¤РёРєСЃРёСЂСѓРµРј СЃСЂР°Р·Сѓ, Р° РЅРµ РІ Completed: РїРµСЂРµС…РѕРґ РјРѕР¶РµС‚ РЅР°С‡Р°С‚СЊСЃСЏ РїРѕСЃСЂРµРґРё
+	-- Р°РЅРёРјР°С†РёРё, Рё closeOpenInfoFrame РґРѕР»Р¶РµРЅ РЅР°Р№С‚Рё С„СЂРµР№Рј, С‡С‚РѕР±С‹ РµРіРѕ Р·Р°РєСЂС‹С‚СЊ
 	currentInfoFrame = infoFrame
 	local tween = TweenService:Create(infoFrame,
 		TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -111,14 +111,14 @@ local function showInfoFrame(infoFrame, callback)
 		if playbackState == Enum.PlaybackState.Completed then
 			if callback then callback() end
 		else
-			-- Фрейм прерван переходом (closeOpenInfoFrame уже сбросил
-			-- currentInfoFrame): снимаем только флаг анимации
+			-- Р¤СЂРµР№Рј РїСЂРµСЂРІР°РЅ РїРµСЂРµС…РѕРґРѕРј (closeOpenInfoFrame СѓР¶Рµ СЃР±СЂРѕСЃРёР»
+			-- currentInfoFrame): СЃРЅРёРјР°РµРј С‚РѕР»СЊРєРѕ С„Р»Р°Рі Р°РЅРёРјР°С†РёРё
 			isInfoAnimating = false
 		end
 	end)
 end
 
--- Обработчик нажатия на кнопку стихии (открыть/закрыть/переключить)
+-- РћР±СЂР°Р±РѕС‚С‡РёРє РЅР°Р¶Р°С‚РёСЏ РЅР° РєРЅРѕРїРєСѓ СЃС‚РёС…РёРё (РѕС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ/РїРµСЂРµРєР»СЋС‡РёС‚СЊ)
 local function onElementButtonClicked(button, infoFrame)
 	if not acquireClick() then return end
 
@@ -136,7 +136,7 @@ local function onElementButtonClicked(button, infoFrame)
 		local previous = currentInfoFrame
 		local function openNew()
 			showInfoFrame(infoFrame, function()
-				-- currentInfoFrame уже выставлен в showInfoFrame до анимации
+				-- currentInfoFrame СѓР¶Рµ РІС‹СЃС‚Р°РІР»РµРЅ РІ showInfoFrame РґРѕ Р°РЅРёРјР°С†РёРё
 				isInfoAnimating = false
 			end)
 		end
@@ -147,30 +147,30 @@ local function onElementButtonClicked(button, infoFrame)
 		end
 	end
 
-	-- Одно решение на всех: и инфо-фрейм, и подписчики (подсветка +
-	-- "Ваш выбор" в HoverBorder2) живут по нему
-	print("ElementMenu: " .. infoFrame.Name .. " -> " .. (selecting and "выбрана" or "снята"))
+	-- РћРґРЅРѕ СЂРµС€РµРЅРёРµ РЅР° РІСЃРµС…: Рё РёРЅС„Рѕ-С„СЂРµР№Рј, Рё РїРѕРґРїРёСЃС‡РёРєРё (РїРѕРґСЃРІРµС‚РєР° +
+	-- "Р’Р°С€ РІС‹Р±РѕСЂ" РІ HoverBorder2) Р¶РёРІСѓС‚ РїРѕ РЅРµРјСѓ
+	print("ElementMenu: " .. infoFrame.Name .. " -> " .. (selecting and "РІС‹Р±СЂР°РЅР°" or "СЃРЅСЏС‚Р°"))
 	for _, listener in ipairs(toggleListeners) do
 		listener(button, selecting)
 	end
 end
 
--- ===================== ИНИЦИАЛИЗАЦИЯ =====================
+-- ===================== РРќРР¦РРђР›РР—РђР¦РРЇ =====================
 -- init(deps): deps = {
 --   elementMenu     = ElementMenuGui,
---   yourChoiceFrame = элемент YourChoiceFrame (изначально прячется),
+--   yourChoiceFrame = СЌР»РµРјРµРЅС‚ YourChoiceFrame (РёР·РЅР°С‡Р°Р»СЊРЅРѕ РїСЂСЏС‡РµС‚СЃСЏ),
 -- }
 function ElementMenu.init(deps)
 	local elementMenu = deps.elementMenu
 
-	-- YourChoiceFrame изначально спрятан снизу
+	-- YourChoiceFrame РёР·РЅР°С‡Р°Р»СЊРЅРѕ СЃРїСЂСЏС‚Р°РЅ СЃРЅРёР·Сѓ
 	local yourChoiceFrame = deps.yourChoiceFrame
 	yourChoiceFrame.Visible = false
 	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)
 
 	local infoFrameContainer = elementMenu:WaitForChild("InfoFrame")
 
-	-- Рекурсивный поиск кнопки по имени внутри elementMenu
+	-- Р РµРєСѓСЂСЃРёРІРЅС‹Р№ РїРѕРёСЃРє РєРЅРѕРїРєРё РїРѕ РёРјРµРЅРё РІРЅСѓС‚СЂРё elementMenu
 	local function findButton(parent, name)
 		for _, child in ipairs(parent:GetChildren()) do
 			if child.Name == name and child:IsA("GuiButton") then
@@ -182,7 +182,7 @@ function ElementMenu.init(deps)
 		return nil
 	end
 
-	-- Скрываем все инфо-фреймы и подключаем кнопки стихий
+	-- РЎРєСЂС‹РІР°РµРј РІСЃРµ РёРЅС„Рѕ-С„СЂРµР№РјС‹ Рё РїРѕРґРєР»СЋС‡Р°РµРј РєРЅРѕРїРєРё СЃС‚РёС…РёР№
 	for _, element in ipairs(ELEMENTS) do
 		local infoFrame = infoFrameContainer:WaitForChild(element.infoFrame)
 		infoFrame.Visible = false
@@ -190,10 +190,10 @@ function ElementMenu.init(deps)
 
 		local button = findButton(elementMenu, element.button)
 		if not button then
-			warn("Кнопка " .. element.button .. " не найдена в ElementMenuGui!")
+			warn("РљРЅРѕРїРєР° " .. element.button .. " РЅРµ РЅР°Р№РґРµРЅР° РІ ElementMenuGui!")
 		else
-			-- Единственная точка клика по кнопке стихии; Activated работает
-			-- и с геймпадом (HoverBorder2 получает решение через onElementToggled)
+			-- Р•РґРёРЅСЃС‚РІРµРЅРЅР°СЏ С‚РѕС‡РєР° РєР»РёРєР° РїРѕ РєРЅРѕРїРєРµ СЃС‚РёС…РёРё; Activated СЂР°Р±РѕС‚Р°РµС‚
+			-- Рё СЃ РіРµР№РјРїР°РґРѕРј (HoverBorder2 РїРѕР»СѓС‡Р°РµС‚ СЂРµС€РµРЅРёРµ С‡РµСЂРµР· onElementToggled)
 			button.Activated:Connect(function()
 				onElementButtonClicked(button, infoFrame)
 			end)
@@ -201,30 +201,30 @@ function ElementMenu.init(deps)
 	end
 end
 
--- Включает/выключает обработку кликов по кнопкам стихий.
--- SceneTransition выключает на время переходов (пока панели меню стихий
--- уезжают, GUI ещё активен ~0.8с) и включает при возврате в меню стихий.
+-- Р’РєР»СЋС‡Р°РµС‚/РІС‹РєР»СЋС‡Р°РµС‚ РѕР±СЂР°Р±РѕС‚РєСѓ РєР»РёРєРѕРІ РїРѕ РєРЅРѕРїРєР°Рј СЃС‚РёС…РёР№.
+-- SceneTransition РІС‹РєР»СЋС‡Р°РµС‚ РЅР° РІСЂРµРјСЏ РїРµСЂРµС…РѕРґРѕРІ (РїРѕРєР° РїР°РЅРµР»Рё РјРµРЅСЋ СЃС‚РёС…РёР№
+-- СѓРµР·Р¶Р°СЋС‚, GUI РµС‰С‘ Р°РєС‚РёРІРµРЅ ~0.8СЃ) Рё РІРєР»СЋС‡Р°РµС‚ РїСЂРё РІРѕР·РІСЂР°С‚Рµ РІ РјРµРЅСЋ СЃС‚РёС…РёР№.
 function ElementMenu.setInputEnabled(enabled)
 	inputEnabled = enabled
 end
 
--- Принудительно убрать открытый инфо-фрейм (если есть). Вызывается при переходах.
--- duration - длительность анимации, hideOnComplete - скрыть фрейм после анимации.
--- Возвращает запущенный Tween или nil, если открытого фрейма не было.
+-- РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ СѓР±СЂР°С‚СЊ РѕС‚РєСЂС‹С‚С‹Р№ РёРЅС„Рѕ-С„СЂРµР№Рј (РµСЃР»Рё РµСЃС‚СЊ). Р’С‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё РїРµСЂРµС…РѕРґР°С….
+-- duration - РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ Р°РЅРёРјР°С†РёРё, hideOnComplete - СЃРєСЂС‹С‚СЊ С„СЂРµР№Рј РїРѕСЃР»Рµ Р°РЅРёРјР°С†РёРё.
+-- Р’РѕР·РІСЂР°С‰Р°РµС‚ Р·Р°РїСѓС‰РµРЅРЅС‹Р№ Tween РёР»Рё nil, РµСЃР»Рё РѕС‚РєСЂС‹С‚РѕРіРѕ С„СЂРµР№РјР° РЅРµ Р±С‹Р»Рѕ.
 function ElementMenu.closeOpenInfoFrame(duration, hideOnComplete)
 	if not currentInfoFrame then
 		return nil
 	end
 	local frameToClose = currentInfoFrame
-	currentInfoFrame = nil                -- сбрасываем ссылку сразу
+	currentInfoFrame = nil                -- СЃР±СЂР°СЃС‹РІР°РµРј СЃСЃС‹Р»РєСѓ СЃСЂР°Р·Сѓ
 	local closeTween = TweenService:Create(frameToClose,
 		TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{Position = INFO_HIDE_POS})
 	closeTween:Play()
 	if hideOnComplete then
 		closeTween.Completed:Connect(function(playbackState)
-			-- Completed срабатывает и при отмене: повторное открытие фрейма
-			-- отменило бы этот твин, и прятать его в этом случае нельзя
+			-- Completed СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ Рё РїСЂРё РѕС‚РјРµРЅРµ: РїРѕРІС‚РѕСЂРЅРѕРµ РѕС‚РєСЂС‹С‚РёРµ С„СЂРµР№РјР°
+			-- РѕС‚РјРµРЅРёР»Рѕ Р±С‹ СЌС‚РѕС‚ С‚РІРёРЅ, Рё РїСЂСЏС‚Р°С‚СЊ РµРіРѕ РІ СЌС‚РѕРј СЃР»СѓС‡Р°Рµ РЅРµР»СЊР·СЏ
 			if playbackState == Enum.PlaybackState.Completed then
 				frameToClose.Visible = false
 			end

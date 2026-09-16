@@ -3,14 +3,14 @@
 
     camera.CameraType = Enum.CameraType.Scriptable
 
-    -- Вариант 1: Строго горизонтально (прямо)
+    -- Р’Р°СЂРёР°РЅС‚ 1: РЎС‚СЂРѕРіРѕ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРѕ (РїСЂСЏРјРѕ)
     local targetPosition = Vector3.new(0, 8, 0)
-    local lookAtPoint = Vector3.new(0, 8, -50)  -- смотрит прямо вдоль отрицательной Z
+    local lookAtPoint = Vector3.new(0, 8, -50)  -- СЃРјРѕС‚СЂРёС‚ РїСЂСЏРјРѕ РІРґРѕР»СЊ РѕС‚СЂРёС†Р°С‚РµР»СЊРЅРѕР№ Z
 
-    -- Вариант 2: Лёгкий наклон для красивого вида (как в Genshin)
+    -- Р’Р°СЂРёР°РЅС‚ 2: Р›С‘РіРєРёР№ РЅР°РєР»РѕРЅ РґР»СЏ РєСЂР°СЃРёРІРѕРіРѕ РІРёРґР° (РєР°Рє РІ Genshin)
     -- local targetPosition = Vector3.new(0, 10, 15)
-    -- local lookAtPoint = Vector3.new(0, 2, 0)   -- камера смотрит немного вниз и вперёд
+    -- local lookAtPoint = Vector3.new(0, 2, 0)   -- РєР°РјРµСЂР° СЃРјРѕС‚СЂРёС‚ РЅРµРјРЅРѕРіРѕ РІРЅРёР· Рё РІРїРµСЂС‘Рґ
 
     local cameraCFrame = CFrame.lookAt(targetPosition, lookAtPoint)
     camera.CFrame = cameraCFrame
-    camera.FieldOfView = 55  -- узкий угол для кинематографичности
+    camera.FieldOfView = 55  -- СѓР·РєРёР№ СѓРіРѕР» РґР»СЏ РєРёРЅРµРјР°С‚РѕРіСЂР°С„РёС‡РЅРѕСЃС‚Рё

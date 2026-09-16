@@ -1,43 +1,43 @@
 --[[
-	SceneEffects - клиентский модуль эффектов переходов.
-	ModuleScript: поместить в ReplicatedStorage с именем "SceneEffects".
-	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+	SceneEffects - РєР»РёРµРЅС‚СЃРєРёР№ РјРѕРґСѓР»СЊ СЌС„С„РµРєС‚РѕРІ РїРµСЂРµС…РѕРґРѕРІ.
+	ModuleScript: РїРѕРјРµСЃС‚РёС‚СЊ РІ ReplicatedStorage СЃ РёРјРµРЅРµРј "SceneEffects".
+	РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Р»РѕРєР°Р»СЊРЅС‹Рј СЃРєСЂРёРїС‚РѕРј SceneTransition (СЃРј. SceneTransition.txt).
 
-	Общие анимации: поворот камеры, показ/скрытие редактора персонажа,
-	меню стихий и YourChoiceFrame. Функции твинов возвращают последний
-	запущенный Tween, если вызывающему нужен его Completed.
+	РћР±С‰РёРµ Р°РЅРёРјР°С†РёРё: РїРѕРІРѕСЂРѕС‚ РєР°РјРµСЂС‹, РїРѕРєР°Р·/СЃРєСЂС‹С‚РёРµ СЂРµРґР°РєС‚РѕСЂР° РїРµСЂСЃРѕРЅР°Р¶Р°,
+	РјРµРЅСЋ СЃС‚РёС…РёР№ Рё YourChoiceFrame. Р¤СѓРЅРєС†РёРё С‚РІРёРЅРѕРІ РІРѕР·РІСЂР°С‰Р°СЋС‚ РїРѕСЃР»РµРґРЅРёР№
+	Р·Р°РїСѓС‰РµРЅРЅС‹Р№ Tween, РµСЃР»Рё РІС‹Р·С‹РІР°СЋС‰РµРјСѓ РЅСѓР¶РµРЅ РµРіРѕ Completed.
 ]]
 
 local TweenService = game:GetService("TweenService")
 
 local SceneEffects = {}
 
--- Единый стиль анимаций панелей (0.8 сек)
+-- Р•РґРёРЅС‹Р№ СЃС‚РёР»СЊ Р°РЅРёРјР°С†РёР№ РїР°РЅРµР»РµР№ (0.8 СЃРµРє)
 local TWEEN_INFO = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Ссылки на интерфейс, заполняются в init()
+-- РЎСЃС‹Р»РєРё РЅР° РёРЅС‚РµСЂС„РµР№СЃ, Р·Р°РїРѕР»РЅСЏСЋС‚СЃСЏ РІ init()
 local ui = {}
 
 -- init(deps): deps = {
 --   buttonContainer, customizeLeft, customizeRight, customizeText,
---   leftRight, randomFrame                - панели редактора (CreationMenuGui)
+--   leftRight, randomFrame                - РїР°РЅРµР»Рё СЂРµРґР°РєС‚РѕСЂР° (CreationMenuGui)
 --   elementMenu, elementButtonContainer,
 --   elementBackFrameUp, elementBackFrameDown, elementBackFrame,
---   yourChoiceFrame                       - панели меню стихий (ElementMenuGui)
---   bgLeft, bgRight,                      - фоновые панели (MainMenuGui)
---   bgLeftOriginalPos, bgRightOriginalPos - их исходные позиции
+--   yourChoiceFrame                       - РїР°РЅРµР»Рё РјРµРЅСЋ СЃС‚РёС…РёР№ (ElementMenuGui)
+--   bgLeft, bgRight,                      - С„РѕРЅРѕРІС‹Рµ РїР°РЅРµР»Рё (MainMenuGui)
+--   bgLeftOriginalPos, bgRightOriginalPos - РёС… РёСЃС…РѕРґРЅС‹Рµ РїРѕР·РёС†РёРё
 -- }
 function SceneEffects.init(deps)
 	ui = deps
 end
 
--- ===================== РЕДАКТОР ПЕРСОНАЖА =====================
+-- ===================== Р Р•Р”РђРљРўРћР  РџР•Р РЎРћРќРђР–Рђ =====================
 
--- Во всех Completed-обработчиках ниже проверяем playbackState: Completed
--- срабатывает и при отмене твина (см. ElementMenu), а прятать панели по отмене
--- нельзя (подробности - в important_docs/bugs_2.md, L3)
+-- Р’Рѕ РІСЃРµС… Completed-РѕР±СЂР°Р±РѕС‚С‡РёРєР°С… РЅРёР¶Рµ РїСЂРѕРІРµСЂСЏРµРј playbackState: Completed
+-- СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ Рё РїСЂРё РѕС‚РјРµРЅРµ С‚РІРёРЅР° (СЃРј. ElementMenu), Р° РїСЂСЏС‚Р°С‚СЊ РїР°РЅРµР»Рё РїРѕ РѕС‚РјРµРЅРµ
+-- РЅРµР»СЊР·СЏ (РїРѕРґСЂРѕР±РЅРѕСЃС‚Рё - РІ important_docs/bugs_2.md, L3)
 
--- Показ редактора персонажа (из главного меню или из меню стихий)
+-- РџРѕРєР°Р· СЂРµРґР°РєС‚РѕСЂР° РїРµСЂСЃРѕРЅР°Р¶Р° (РёР· РіР»Р°РІРЅРѕРіРѕ РјРµРЅСЋ РёР»Рё РёР· РјРµРЅСЋ СЃС‚РёС…РёР№)
 function SceneEffects.showCreationUI()
 	local buttonContainer = ui.buttonContainer
 	buttonContainer.Visible = true
@@ -69,7 +69,7 @@ function SceneEffects.showCreationUI()
 	TweenService:Create(leftRight, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
 
-	-- Анимация появления Random
+	-- РђРЅРёРјР°С†РёСЏ РїРѕСЏРІР»РµРЅРёСЏ Random
 	local randomFrame = ui.randomFrame
 	randomFrame.Position = UDim2.new(1.1, 0, 0.15, 0)
 	randomFrame.Visible = true
@@ -82,8 +82,8 @@ function SceneEffects.showCreationUI()
 		{Position = UDim2.new(0.9, 0, 0.5, 0)}):Play()
 end
 
--- Скрытие редактора персонажа (в главное меню или в меню стихий).
--- onHidden вызывается, когда уехала последняя панель (leftRight).
+-- РЎРєСЂС‹С‚РёРµ СЂРµРґР°РєС‚РѕСЂР° РїРµСЂСЃРѕРЅР°Р¶Р° (РІ РіР»Р°РІРЅРѕРµ РјРµРЅСЋ РёР»Рё РІ РјРµРЅСЋ СЃС‚РёС…РёР№).
+-- onHidden РІС‹Р·С‹РІР°РµС‚СЃСЏ, РєРѕРіРґР° СѓРµС…Р°Р»Р° РїРѕСЃР»РµРґРЅСЏСЏ РїР°РЅРµР»СЊ (leftRight).
 function SceneEffects.hideCreationUI(onHidden)
 	local buttonContainer = ui.buttonContainer
 	local tweenBottom = TweenService:Create(buttonContainer, TWEEN_INFO,
@@ -127,36 +127,36 @@ function SceneEffects.hideCreationUI(onHidden)
 		{Position = ui.bgRightOriginalPos}):Play()
 end
 
--- ===================== МЕНЮ СТИХИЙ =====================
+-- ===================== РњР•РќР® РЎРўРРҐРР™ =====================
 
--- Появление меню стихий (панели навигации)
+-- РџРѕСЏРІР»РµРЅРёРµ РјРµРЅСЋ СЃС‚РёС…РёР№ (РїР°РЅРµР»Рё РЅР°РІРёРіР°С†РёРё)
 function SceneEffects.showElementMenu()
 	local elementMenu = ui.elementMenu
-	elementMenu.Enabled = true  -- Включаем весь GUI, если он был выключен
+	elementMenu.Enabled = true  -- Р’РєР»СЋС‡Р°РµРј РІРµСЃСЊ GUI, РµСЃР»Рё РѕРЅ Р±С‹Р» РІС‹РєР»СЋС‡РµРЅ
 
-	-- ButtonContainer: появляется снизу так же, как CreationMenuGui.ButtonContainer
+	-- ButtonContainer: РїРѕСЏРІР»СЏРµС‚СЃСЏ СЃРЅРёР·Сѓ С‚Р°Рє Р¶Рµ, РєР°Рє CreationMenuGui.ButtonContainer
 	local elementButtonContainer = ui.elementButtonContainer
 	elementButtonContainer.Visible = true
-	elementButtonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)  -- старт снизу
+	elementButtonContainer.Position = UDim2.new(0.5, 0, 1.2, 0)  -- СЃС‚Р°СЂС‚ СЃРЅРёР·Сѓ
 	TweenService:Create(elementButtonContainer, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
 
-	-- BackFrameUp: сверху вниз
+	-- BackFrameUp: СЃРІРµСЂС…Сѓ РІРЅРёР·
 	local backFrameUp = ui.elementBackFrameUp
 	backFrameUp.Visible = true
 	backFrameUp.Position = UDim2.new(0.5, 0, -0.2, 0)
 	TweenService:Create(backFrameUp, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 0.8, 0)}):Play()
 
-	-- BackFrameDown: снизу вверх
+	-- BackFrameDown: СЃРЅРёР·Сѓ РІРІРµСЂС…
 	local backFrameDown = ui.elementBackFrameDown
 	backFrameDown.Visible = true
 	backFrameDown.Position = UDim2.new(0.5, 0, 1.1, 0)
 	TweenService:Create(backFrameDown, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 0, 0)}):Play()
 
-	-- BackFrame: слева направо (конечная позиция - справа за экраном)
-	-- Если нужно, чтобы он останавливался в видимой области, замените конечный X на 0.5
+	-- BackFrame: СЃР»РµРІР° РЅР°РїСЂР°РІРѕ (РєРѕРЅРµС‡РЅР°СЏ РїРѕР·РёС†РёСЏ - СЃРїСЂР°РІР° Р·Р° СЌРєСЂР°РЅРѕРј)
+	-- Р•СЃР»Рё РЅСѓР¶РЅРѕ, С‡С‚РѕР±С‹ РѕРЅ РѕСЃС‚Р°РЅР°РІР»РёРІР°Р»СЃСЏ РІ РІРёРґРёРјРѕР№ РѕР±Р»Р°СЃС‚Рё, Р·Р°РјРµРЅРёС‚Рµ РєРѕРЅРµС‡РЅС‹Р№ X РЅР° 0.5
 	local backFrame = ui.elementBackFrame
 	backFrame.Visible = true
 	backFrame.Position = UDim2.new(-0.1, 0, 0.4, 0)
@@ -164,11 +164,11 @@ function SceneEffects.showElementMenu()
 		{Position = UDim2.new(1, 0, 0.4, 0)}):Play()
 end
 
--- Скрытие меню стихий.
--- opts.onHidden - вызывается в Completed backFrame (после скрытия панелей)
--- opts.yourChoice - что делать с YourChoiceFrame:
---   "hide"  - увезти вниз и спрятать после анимации (выход назад)
---   "slide" - только увезти вниз (финальный переход)
+-- РЎРєСЂС‹С‚РёРµ РјРµРЅСЋ СЃС‚РёС…РёР№.
+-- opts.onHidden - РІС‹Р·С‹РІР°РµС‚СЃСЏ РІ Completed backFrame (РїРѕСЃР»Рµ СЃРєСЂС‹С‚РёСЏ РїР°РЅРµР»РµР№)
+-- opts.yourChoice - С‡С‚Рѕ РґРµР»Р°С‚СЊ СЃ YourChoiceFrame:
+--   "hide"  - СѓРІРµР·С‚Рё РІРЅРёР· Рё СЃРїСЂСЏС‚Р°С‚СЊ РїРѕСЃР»Рµ Р°РЅРёРјР°С†РёРё (РІС‹С…РѕРґ РЅР°Р·Р°Рґ)
+--   "slide" - С‚РѕР»СЊРєРѕ СѓРІРµР·С‚Рё РІРЅРёР· (С„РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ)
 function SceneEffects.hideElementMenu(opts)
 	opts = opts or {}
 
@@ -209,24 +209,24 @@ function SceneEffects.hideElementMenu(opts)
 	end
 end
 
--- Появление YourChoiceFrame снизу
+-- РџРѕСЏРІР»РµРЅРёРµ YourChoiceFrame СЃРЅРёР·Сѓ
 function SceneEffects.showYourChoiceFrame()
 	local yourChoiceFrame = ui.yourChoiceFrame
 	yourChoiceFrame.Visible = true
-	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)  -- начинаем снизу
+	yourChoiceFrame.Position = UDim2.new(0.5, 0, 1.1, 0)  -- РЅР°С‡РёРЅР°РµРј СЃРЅРёР·Сѓ
 	TweenService:Create(yourChoiceFrame, TWEEN_INFO,
 		{Position = UDim2.new(0.5, 0, 0.9, 0)}):Play()
 end
 
--- ===================== КАМЕРА =====================
+-- ===================== РљРђРњР•Р Рђ =====================
 
--- Активный поворот камеры: новый вызов отменяет предыдущий, иначе два обработчика
--- Changed одновременно пишут camera.CFrame (мерцание) и твины мешают друг другу
+-- РђРєС‚РёРІРЅС‹Р№ РїРѕРІРѕСЂРѕС‚ РєР°РјРµСЂС‹: РЅРѕРІС‹Р№ РІС‹Р·РѕРІ РѕС‚РјРµРЅСЏРµС‚ РїСЂРµРґС‹РґСѓС‰РёР№, РёРЅР°С‡Рµ РґРІР° РѕР±СЂР°Р±РѕС‚С‡РёРєР°
+-- Changed РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ РїРёС€СѓС‚ camera.CFrame (РјРµСЂС†Р°РЅРёРµ) Рё С‚РІРёРЅС‹ РјРµС€Р°СЋС‚ РґСЂСѓРі РґСЂСѓРіСѓ
 local activeYawTween = nil
 local activeYawValue = nil
 
--- Плавный поворот камеры вокруг вертикальной оси через NumberValue.
--- Возвращает запущенный Tween или nil, если CurrentCamera отсутствует.
+-- РџР»Р°РІРЅС‹Р№ РїРѕРІРѕСЂРѕС‚ РєР°РјРµСЂС‹ РІРѕРєСЂСѓРі РІРµСЂС‚РёРєР°Р»СЊРЅРѕР№ РѕСЃРё С‡РµСЂРµР· NumberValue.
+-- Р’РѕР·РІСЂР°С‰Р°РµС‚ Р·Р°РїСѓС‰РµРЅРЅС‹Р№ Tween РёР»Рё nil, РµСЃР»Рё CurrentCamera РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚.
 function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -251,7 +251,7 @@ function SceneEffects.tweenCameraYaw(basePos, fromAngle, toAngle, duration)
 		camera.CFrame = CFrame.new(basePos) * CFrame.Angles(0, angleVal.Value, 0)
 	end)
 	tweenCam.Completed:Connect(function()
-		-- Чистим только если это ещё актуальный твин (не отменён новым вызовом)
+		-- Р§РёСЃС‚РёРј С‚РѕР»СЊРєРѕ РµСЃР»Рё СЌС‚Рѕ РµС‰С‘ Р°РєС‚СѓР°Р»СЊРЅС‹Р№ С‚РІРёРЅ (РЅРµ РѕС‚РјРµРЅС‘РЅ РЅРѕРІС‹Рј РІС‹Р·РѕРІРѕРј)
 		if activeYawValue == angleVal then
 			angleVal:Destroy()
 			activeYawTween = nil

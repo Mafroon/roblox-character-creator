@@ -7,7 +7,7 @@ local RunService = game:GetService("RunService")
 
 local startGameEvent = ReplicatedStorage:WaitForChild("StartGameEvent", 10)
 if not startGameEvent then
-	warn("StartGameEvent не найден!")
+	warn("StartGameEvent РЅРµ РЅР°Р№РґРµРЅ!")
 	return
 end
 
@@ -25,18 +25,18 @@ if not playerGui then return end
 
 ReplicatedFirst:RemoveDefaultLoadingScreen()
 
--- Если шаблона нет — просто пропускаем экран загрузки, но не ломаем сессию:
--- иначе StartGameEvent не сработает и SceneTransition будет ждать вечно
+-- Р•СЃР»Рё С€Р°Р±Р»РѕРЅР° РЅРµС‚ вЂ” РїСЂРѕСЃС‚Рѕ РїСЂРѕРїСѓСЃРєР°РµРј СЌРєСЂР°РЅ Р·Р°РіСЂСѓР·РєРё, РЅРѕ РЅРµ Р»РѕРјР°РµРј СЃРµСЃСЃРёСЋ:
+-- РёРЅР°С‡Рµ StartGameEvent РЅРµ СЃСЂР°Р±РѕС‚Р°РµС‚ Рё SceneTransition Р±СѓРґРµС‚ Р¶РґР°С‚СЊ РІРµС‡РЅРѕ
 local loadingTemplate = ReplicatedFirst:WaitForChild("LoadingScreen", 10)
 if not loadingTemplate then
-	warn("Шаблон LoadingScreen не найден - запускаем игру без экрана загрузки")
+	warn("РЁР°Р±Р»РѕРЅ LoadingScreen РЅРµ РЅР°Р№РґРµРЅ - Р·Р°РїСѓСЃРєР°РµРј РёРіСЂСѓ Р±РµР· СЌРєСЂР°РЅР° Р·Р°РіСЂСѓР·РєРё")
 	startGameEvent:Fire()
 	return
 end
 local loadingGui = loadingTemplate:Clone()
 loadingGui.Parent = playerGui
 
--- скрываем другие GUI
+-- СЃРєСЂС‹РІР°РµРј РґСЂСѓРіРёРµ GUI
 for _, gui in playerGui:GetChildren() do
 	if gui:IsA("ScreenGui") and gui ~= loadingGui then
 		gui.Enabled = false
@@ -49,10 +49,10 @@ local guiBlocker = playerGui.ChildAdded:Connect(function(child)
 	end
 end)
 
--- Аварийное завершение: снимаем блокировку GUI и всё равно запускаем игру.
--- Нельзя просто return: guiBlocker остался бы навсегда и "убил" бы всю сессию.
+-- РђРІР°СЂРёР№РЅРѕРµ Р·Р°РІРµСЂС€РµРЅРёРµ: СЃРЅРёРјР°РµРј Р±Р»РѕРєРёСЂРѕРІРєСѓ GUI Рё РІСЃС‘ СЂР°РІРЅРѕ Р·Р°РїСѓСЃРєР°РµРј РёРіСЂСѓ.
+-- РќРµР»СЊР·СЏ РїСЂРѕСЃС‚Рѕ return: guiBlocker РѕСЃС‚Р°Р»СЃСЏ Р±С‹ РЅР°РІСЃРµРіРґР° Рё "СѓР±РёР»" Р±С‹ РІСЃСЋ СЃРµСЃСЃРёСЋ.
 local function abortLoadingScreen(reason)
-	warn("Экран загрузки прерван: " .. reason)
+	warn("Р­РєСЂР°РЅ Р·Р°РіСЂСѓР·РєРё РїСЂРµСЂРІР°РЅ: " .. reason)
 	guiBlocker:Disconnect()
 	for _, gui in playerGui:GetChildren() do
 		if gui:IsA("ScreenGui") and gui ~= loadingGui then
@@ -65,21 +65,21 @@ end
 
 local backFrame = loadingGui:WaitForChild("BackFrame", 5)
 local continueFrame = backFrame and backFrame:WaitForChild("ContinueFrame", 5)
-if not continueFrame then return abortLoadingScreen("ContinueFrame не найден") end
+if not continueFrame then return abortLoadingScreen("ContinueFrame РЅРµ РЅР°Р№РґРµРЅ") end
 continueFrame.Position = UDim2.new(0.5, 0, 1.1, 0)
 
 local line = backFrame:WaitForChild("Line", 5)
-if not line then return abortLoadingScreen("Line не найден") end
+if not line then return abortLoadingScreen("Line РЅРµ РЅР°Р№РґРµРЅ") end
 line.Rotation = 90
 line.Size = UDim2.new(1, 0, 0, 0)
 
--- Цепочка разбита на шаги: chained WaitForChild на nil-промежуточном падает с ошибкой
+-- Р¦РµРїРѕС‡РєР° СЂР°Р·Р±РёС‚Р° РЅР° С€Р°РіРё: chained WaitForChild РЅР° nil-РїСЂРѕРјРµР¶СѓС‚РѕС‡РЅРѕРј РїР°РґР°РµС‚ СЃ РѕС€РёР±РєРѕР№
 local namesFrame = backFrame:WaitForChild("Names", 5)
 local nameFrame = namesFrame and namesFrame:WaitForChild("Name", 5)
 local draftFrame = nameFrame and nameFrame:WaitForChild("Draft", 5)
-if not draftFrame then return abortLoadingScreen("Draft не найден") end
+if not draftFrame then return abortLoadingScreen("Draft РЅРµ РЅР°Р№РґРµРЅ") end
 local gradient = draftFrame:WaitForChild("UIGradient", 5)
-if not gradient then return abortLoadingScreen("UIGradient не найден") end
+if not gradient then return abortLoadingScreen("UIGradient РЅРµ РЅР°Р№РґРµРЅ") end
 
 local accumulatedTime = 0
 local renderConnection = RunService.RenderStepped:Connect(function(dt)
@@ -105,7 +105,7 @@ TweenService:Create(continueFrame, showInfo, {Position = UDim2.new(0.5, 0, 0.77,
 
 local continueButton = continueFrame:WaitForChild("ContinueButton", 5)
 if continueButton then
-	-- Activated покрывает мышь, тач и геймпад (MouseButton1Click - только мышь)
+	-- Activated РїРѕРєСЂС‹РІР°РµС‚ РјС‹С€СЊ, С‚Р°С‡ Рё РіРµР№РјРїР°Рґ (MouseButton1Click - С‚РѕР»СЊРєРѕ РјС‹С€СЊ)
 	continueButton.Activated:Wait()
 end
 

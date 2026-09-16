@@ -9,10 +9,10 @@
 
     local rotatingLeft = false
     local rotatingRight = false
-    local ROTATION_SPEED = 90  -- градусов в секунду
-    local currentRotation = nil  -- захватим начальный угол при первом нажатии
+    local ROTATION_SPEED = 90  -- РіСЂР°РґСѓСЃРѕРІ РІ СЃРµРєСѓРЅРґСѓ
+    local currentRotation = nil  -- Р·Р°С…РІР°С‚РёРј РЅР°С‡Р°Р»СЊРЅС‹Р№ СѓРіРѕР» РїСЂРё РїРµСЂРІРѕРј РЅР°Р¶Р°С‚РёРё
 
-    -- Подключаем кнопки
+    -- РџРѕРґРєР»СЋС‡Р°РµРј РєРЅРѕРїРєРё
     leftBtn.MouseButton1Down:Connect(function() rotatingLeft = true end)
     leftBtn.MouseButton1Up:Connect(function() rotatingLeft = false end)
     leftBtn.MouseLeave:Connect(function() rotatingLeft = false end)
@@ -21,17 +21,17 @@
     rightBtn.MouseButton1Up:Connect(function() rotatingRight = false end)
     rightBtn.MouseLeave:Connect(function() rotatingRight = false end)
 
-    -- Главный цикл вращения
+    -- Р“Р»Р°РІРЅС‹Р№ С†РёРєР» РІСЂР°С‰РµРЅРёСЏ
     RunService.RenderStepped:Connect(function(dt)
         if not (rotatingLeft or rotatingRight) then return end
-        if not leftRight.Visible then return end  -- не в режиме создания
+        if not leftRight.Visible then return end  -- РЅРµ РІ СЂРµР¶РёРјРµ СЃРѕР·РґР°РЅРёСЏ
 
         local char = player.Character
         if not char then return end
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
-        -- Запоминаем начальный угол при первом нажатии
+        -- Р—Р°РїРѕРјРёРЅР°РµРј РЅР°С‡Р°Р»СЊРЅС‹Р№ СѓРіРѕР» РїСЂРё РїРµСЂРІРѕРј РЅР°Р¶Р°С‚РёРё
         if currentRotation == nil then
             local _, y, _ = root.CFrame:ToOrientation()
             currentRotation = y
@@ -39,16 +39,16 @@
 
         local angle = math.rad(ROTATION_SPEED) * dt
         if rotatingLeft then
-            -- Left -> поворот вправо (по часовой) > отрицательный угол
+            -- Left -> РїРѕРІРѕСЂРѕС‚ РІРїСЂР°РІРѕ (РїРѕ С‡Р°СЃРѕРІРѕР№) > РѕС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Р№ СѓРіРѕР»
             currentRotation = currentRotation - angle
         elseif rotatingRight then
-            -- Right -> поворот влево > положительный угол
+            -- Right -> РїРѕРІРѕСЂРѕС‚ РІР»РµРІРѕ > РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Р№ СѓРіРѕР»
             currentRotation = currentRotation + angle
         end
 
-        -- Применяем поворот, сохраняя позицию
+        -- РџСЂРёРјРµРЅСЏРµРј РїРѕРІРѕСЂРѕС‚, СЃРѕС…СЂР°РЅСЏСЏ РїРѕР·РёС†РёСЋ
         root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, currentRotation, 0)
-        -- Обнуляем скорости, чтобы физика не дёргала
+        -- РћР±РЅСѓР»СЏРµРј СЃРєРѕСЂРѕСЃС‚Рё, С‡С‚РѕР±С‹ С„РёР·РёРєР° РЅРµ РґС‘СЂРіР°Р»Р°
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
     end)

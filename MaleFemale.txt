@@ -9,11 +9,11 @@ local genderFolder = ServerStorage:WaitForChild("Gender")
 local maleRig = genderFolder:WaitForChild("Male")
 local femaleRig = genderFolder:WaitForChild("Female")
 
--- Функция замены конкретной части тела
+-- Р¤СѓРЅРєС†РёСЏ Р·Р°РјРµРЅС‹ РєРѕРЅРєСЂРµС‚РЅРѕР№ С‡Р°СЃС‚Рё С‚РµР»Р°
 local function replaceTorso(character, rigModel, partName, bodyPartEnum)
 	local sourcePart = rigModel:FindFirstChild(partName)
 	if not sourcePart then
-		warn("Не найдена часть " .. partName .. " в риге " .. rigModel.Name)
+		warn("РќРµ РЅР°Р№РґРµРЅР° С‡Р°СЃС‚СЊ " .. partName .. " РІ СЂРёРіРµ " .. rigModel.Name)
 		return
 	end
 
@@ -27,10 +27,10 @@ local function replaceTorso(character, rigModel, partName, bodyPartEnum)
 end
 
 changeGenderEvent.OnServerEvent:Connect(function(player, gender)
-	-- Валидация: иначе любое значение, кроме "male" (в т.ч. мусор от эксплойтера),
-	-- молча выбирает женский риг
+	-- Р’Р°Р»РёРґР°С†РёСЏ: РёРЅР°С‡Рµ Р»СЋР±РѕРµ Р·РЅР°С‡РµРЅРёРµ, РєСЂРѕРјРµ "male" (РІ С‚.С‡. РјСѓСЃРѕСЂ РѕС‚ СЌРєСЃРїР»РѕР№С‚РµСЂР°),
+	-- РјРѕР»С‡Р° РІС‹Р±РёСЂР°РµС‚ Р¶РµРЅСЃРєРёР№ СЂРёРі
 	if gender ~= "male" and gender ~= "female" then
-		warn("MaleFemale: некорректный пол " .. tostring(gender) .. " от " .. tostring(player and player.Name))
+		warn("MaleFemale: РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РїРѕР» " .. tostring(gender) .. " РѕС‚ " .. tostring(player and player.Name))
 		return
 	end
 
@@ -39,19 +39,19 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 	local character = player.Character
 
 	if not maleRig or not femaleRig then
-		warn("Риг для пола " .. gender .. " не найден")
+		warn("Р РёРі РґР»СЏ РїРѕР»Р° " .. gender .. " РЅРµ РЅР°Р№РґРµРЅ")
 		return
 	end
 	local rig = (gender == "male") and maleRig or femaleRig
 
-	-- 1. Запоминаем текущий цвет кожи (возьмём цвет головы, он всегда есть)
+	-- 1. Р—Р°РїРѕРјРёРЅР°РµРј С‚РµРєСѓС‰РёР№ С†РІРµС‚ РєРѕР¶Рё (РІРѕР·СЊРјС‘Рј С†РІРµС‚ РіРѕР»РѕРІС‹, РѕРЅ РІСЃРµРіРґР° РµСЃС‚СЊ)
 	local skinColor = nil
 	local head = character:FindFirstChild("Head")
 	if head and head:IsA("BasePart") then
 		skinColor = head.Color
-		print("Сохранён цвет кожи:", skinColor)
+		print("РЎРѕС…СЂР°РЅС‘РЅ С†РІРµС‚ РєРѕР¶Рё:", skinColor)
 	else
-		-- Если головы нет, пробуем взять цвет любой другой части
+		-- Р•СЃР»Рё РіРѕР»РѕРІС‹ РЅРµС‚, РїСЂРѕР±СѓРµРј РІР·СЏС‚СЊ С†РІРµС‚ Р»СЋР±РѕР№ РґСЂСѓРіРѕР№ С‡Р°СЃС‚Рё
 		for _, part in ipairs(character:GetChildren()) do
 			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
 				skinColor = part.Color
@@ -60,11 +60,11 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 		end
 	end
 
-	-- 2. Заменяем торсы
+	-- 2. Р—Р°РјРµРЅСЏРµРј С‚РѕСЂСЃС‹
 	replaceTorso(character, rig, "UpperTorso", Enum.BodyPartR15.UpperTorso)
 	replaceTorso(character, rig, "LowerTorso", Enum.BodyPartR15.LowerTorso)
 
-	-- 3. Обновляем StringValue с полом
+	-- 3. РћР±РЅРѕРІР»СЏРµРј StringValue СЃ РїРѕР»РѕРј
 	local genderValue = player:FindFirstChild("PlayerGender")
 	if not genderValue then
 		genderValue = Instance.new("StringValue")
@@ -73,9 +73,9 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 	end
 	genderValue.Value = gender
 
-	-- 4. Восстанавливаем цвет кожи (применяем ко всем частям тела)
+	-- 4. Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµРј С†РІРµС‚ РєРѕР¶Рё (РїСЂРёРјРµРЅСЏРµРј РєРѕ РІСЃРµРј С‡Р°СЃС‚СЏРј С‚РµР»Р°)
 	if skinColor then
-		RunService.Heartbeat:Wait()  -- ждём ровно 1 кадр, минимум задержки
+		RunService.Heartbeat:Wait()  -- Р¶РґС‘Рј СЂРѕРІРЅРѕ 1 РєР°РґСЂ, РјРёРЅРёРјСѓРј Р·Р°РґРµСЂР¶РєРё
 		local bodyParts = {
 			"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm",
 			"RightUpperArm", "RightLowerArm", "LeftUpperLeg", "LeftLowerLeg",
@@ -87,19 +87,19 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 				part.Color = skinColor
 			end
 		end
-		-- Широкую "подстраховку" (перекраска всех BasePart персонажа) убрали:
-		-- она красила бы цветом кожи любой предмет, если тот окажется голым BasePart
-		print("Цвет кожи восстановлен после смены пола")
+		-- РЁРёСЂРѕРєСѓСЋ "РїРѕРґСЃС‚СЂР°С…РѕРІРєСѓ" (РїРµСЂРµРєСЂР°СЃРєР° РІСЃРµС… BasePart РїРµСЂСЃРѕРЅР°Р¶Р°) СѓР±СЂР°Р»Рё:
+		-- РѕРЅР° РєСЂР°СЃРёР»Р° Р±С‹ С†РІРµС‚РѕРј РєРѕР¶Рё Р»СЋР±РѕР№ РїСЂРµРґРјРµС‚, РµСЃР»Рё С‚РѕС‚ РѕРєР°Р¶РµС‚СЃСЏ РіРѕР»С‹Рј BasePart
+		print("Р¦РІРµС‚ РєРѕР¶Рё РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ РїРѕСЃР»Рµ СЃРјРµРЅС‹ РїРѕР»Р°")
 	end
 
-	-- 5. Замена торсов через ReplaceBodyPartR15 пересобирает Motor6D и может
-	-- остановить игравший idle-трек - перезапускаем его, иначе персонаж
-	-- застывает "стойкой смирно" после смены пола
+	-- 5. Р—Р°РјРµРЅР° С‚РѕСЂСЃРѕРІ С‡РµСЂРµР· ReplaceBodyPartR15 РїРµСЂРµСЃРѕР±РёСЂР°РµС‚ Motor6D Рё РјРѕР¶РµС‚
+	-- РѕСЃС‚Р°РЅРѕРІРёС‚СЊ РёРіСЂР°РІС€РёР№ idle-С‚СЂРµРє - РїРµСЂРµР·Р°РїСѓСЃРєР°РµРј РµРіРѕ, РёРЅР°С‡Рµ РїРµСЂСЃРѕРЅР°Р¶
+	-- Р·Р°СЃС‚С‹РІР°РµС‚ "СЃС‚РѕР№РєРѕР№ СЃРјРёСЂРЅРѕ" РїРѕСЃР»Рµ СЃРјРµРЅС‹ РїРѕР»Р°
 	if _G.ReplayCharacterIdle then
 		_G.ReplayCharacterIdle(character)
 	else
-		warn("MaleFemale: _G.ReplayCharacterIdle недоступен - обновите скрипт ReplaceAvatarWithRig из ReplaceAvatarWithRig.txt")
+		warn("MaleFemale: _G.ReplayCharacterIdle РЅРµРґРѕСЃС‚СѓРїРµРЅ - РѕР±РЅРѕРІРёС‚Рµ СЃРєСЂРёРїС‚ ReplaceAvatarWithRig РёР· ReplaceAvatarWithRig.txt")
 	end
 
-	print("Пол игрока " .. player.Name .. " изменён на " .. gender)
+	print("РџРѕР» РёРіСЂРѕРєР° " .. player.Name .. " РёР·РјРµРЅС‘РЅ РЅР° " .. gender)
 end)

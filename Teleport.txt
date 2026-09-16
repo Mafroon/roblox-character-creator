@@ -1,37 +1,37 @@
--- Серверный скрипт (Script в ServerScriptService)
+-- РЎРµСЂРІРµСЂРЅС‹Р№ СЃРєСЂРёРїС‚ (Script РІ ServerScriptService)
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- ID вашего основного игрового плейса (замените на свой!)
+-- ID РІР°С€РµРіРѕ РѕСЃРЅРѕРІРЅРѕРіРѕ РёРіСЂРѕРІРѕРіРѕ РїР»РµР№СЃР° (Р·Р°РјРµРЅРёС‚Рµ РЅР° СЃРІРѕР№!)
 local GAME_PLACE_ID = 95945939718701
 
--- Создаём RemoteEvent для связи с клиентом
+-- РЎРѕР·РґР°С‘Рј RemoteEvent РґР»СЏ СЃРІСЏР·Рё СЃ РєР»РёРµРЅС‚РѕРј
 local teleportEvent = ReplicatedStorage:WaitForChild("RequestTeleport")
 
--- Функция, которая и будет телепортировать
+-- Р¤СѓРЅРєС†РёСЏ, РєРѕС‚РѕСЂР°СЏ Рё Р±СѓРґРµС‚ С‚РµР»РµРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ
 local function teleportPlayer(player, chosenElement)
-	-- Создаём объект с настройками телепортации (современный способ)
+	-- РЎРѕР·РґР°С‘Рј РѕР±СЉРµРєС‚ СЃ РЅР°СЃС‚СЂРѕР№РєР°РјРё С‚РµР»РµРїРѕСЂС‚Р°С†РёРё (СЃРѕРІСЂРµРјРµРЅРЅС‹Р№ СЃРїРѕСЃРѕР±)
 	local teleportOptions = Instance.new("TeleportOptions")
 
-	-- Передаём в новый плейс выбранную игроком стихию
+	-- РџРµСЂРµРґР°С‘Рј РІ РЅРѕРІС‹Р№ РїР»РµР№СЃ РІС‹Р±СЂР°РЅРЅСѓСЋ РёРіСЂРѕРєРѕРј СЃС‚РёС…РёСЋ
 	teleportOptions:SetTeleportData({ element = chosenElement })
 
-	-- Запускаем телепортацию
+	-- Р—Р°РїСѓСЃРєР°РµРј С‚РµР»РµРїРѕСЂС‚Р°С†РёСЋ
 	local success, errorMessage = pcall(function()
 		TeleportService:TeleportAsync(GAME_PLACE_ID, {player}, teleportOptions)
 	end)
 
 	if not success then
-		warn("Ошибка телепортации игрока " .. player.Name .. ": " .. errorMessage)
-		-- Здесь можно добавить логику для повторной попытки
+		warn("РћС€РёР±РєР° С‚РµР»РµРїРѕСЂС‚Р°С†РёРё РёРіСЂРѕРєР° " .. player.Name .. ": " .. errorMessage)
+		-- Р—РґРµСЃСЊ РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ Р»РѕРіРёРєСѓ РґР»СЏ РїРѕРІС‚РѕСЂРЅРѕР№ РїРѕРїС‹С‚РєРё
 	end
 end
 
--- Слушаем запрос от клиента
--- Белый список стихий: должен совпадать с элементами меню выбора
--- (HoverBorder2.ELEMENT_CONFIG / ElementMenu.ELEMENTS), иначе в принимающий
--- плейс уйдут произвольные данные от клиента
+-- РЎР»СѓС€Р°РµРј Р·Р°РїСЂРѕСЃ РѕС‚ РєР»РёРµРЅС‚Р°
+-- Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє СЃС‚РёС…РёР№: РґРѕР»Р¶РµРЅ СЃРѕРІРїР°РґР°С‚СЊ СЃ СЌР»РµРјРµРЅС‚Р°РјРё РјРµРЅСЋ РІС‹Р±РѕСЂР°
+-- (HoverBorder2.ELEMENT_CONFIG / ElementMenu.ELEMENTS), РёРЅР°С‡Рµ РІ РїСЂРёРЅРёРјР°СЋС‰РёР№
+-- РїР»РµР№СЃ СѓР№РґСѓС‚ РїСЂРѕРёР·РІРѕР»СЊРЅС‹Рµ РґР°РЅРЅС‹Рµ РѕС‚ РєР»РёРµРЅС‚Р°
 local VALID_ELEMENTS = {
 	Fire = true,
 	Water = true,
@@ -43,9 +43,9 @@ local VALID_ELEMENTS = {
 
 teleportEvent.OnServerEvent:Connect(function(player, chosenElement)
 	if typeof(chosenElement) ~= "string" or not VALID_ELEMENTS[chosenElement] then
-		warn("Телепортация отклонена: неизвестная стихия " .. tostring(chosenElement) .. " от " .. player.Name)
+		warn("РўРµР»РµРїРѕСЂС‚Р°С†РёСЏ РѕС‚РєР»РѕРЅРµРЅР°: РЅРµРёР·РІРµСЃС‚РЅР°СЏ СЃС‚РёС…РёСЏ " .. tostring(chosenElement) .. " РѕС‚ " .. player.Name)
 		return
 	end
-	print("Получен запрос на телепортацию от " .. player.Name .. " со стихией " .. chosenElement)
+	print("РџРѕР»СѓС‡РµРЅ Р·Р°РїСЂРѕСЃ РЅР° С‚РµР»РµРїРѕСЂС‚Р°С†РёСЋ РѕС‚ " .. player.Name .. " СЃРѕ СЃС‚РёС…РёРµР№ " .. chosenElement)
 	teleportPlayer(player, chosenElement)
 end)

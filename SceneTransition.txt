@@ -1,16 +1,16 @@
 --[[
-	Главное меню и редактор персонажа (Client-Side LocalScript)
-	Поместить в StarterGui (внутрь MainMenuGui).
+	Р“Р»Р°РІРЅРѕРµ РјРµРЅСЋ Рё СЂРµРґР°РєС‚РѕСЂ РїРµСЂСЃРѕРЅР°Р¶Р° (Client-Side LocalScript)
+	РџРѕРјРµСЃС‚РёС‚СЊ РІ StarterGui (РІРЅСѓС‚СЂСЊ MainMenuGui).
 
-	Оркестратор: ждёт StartGameEvent от загрузочного экрана, инициализирует
-	модули, подключает кнопки и управляет переходами между экранами
-	(меню - редактор - стихии - финальный полёт).
+	РћСЂРєРµСЃС‚СЂР°С‚РѕСЂ: Р¶РґС‘С‚ StartGameEvent РѕС‚ Р·Р°РіСЂСѓР·РѕС‡РЅРѕРіРѕ СЌРєСЂР°РЅР°, РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµС‚
+	РјРѕРґСѓР»Рё, РїРѕРґРєР»СЋС‡Р°РµС‚ РєРЅРѕРїРєРё Рё СѓРїСЂР°РІР»СЏРµС‚ РїРµСЂРµС…РѕРґР°РјРё РјРµР¶РґСѓ СЌРєСЂР°РЅР°РјРё
+	(РјРµРЅСЋ - СЂРµРґР°РєС‚РѕСЂ - СЃС‚РёС…РёРё - С„РёРЅР°Р»СЊРЅС‹Р№ РїРѕР»С‘С‚).
 
-	Требует три ModuleScript в ReplicatedStorage (создайте их и вставьте
-	содержимое соответствующих .txt файлов, имена должны совпадать):
-	  - SceneEffects          (SceneEffects.txt)         - анимации переходов
-	  - InventoryController   (InventoryController.txt)  - инвентари и цвета
-	  - ElementMenu           (ElementMenu.txt)          - инфо-фреймы стихий
+	РўСЂРµР±СѓРµС‚ С‚СЂРё ModuleScript РІ ReplicatedStorage (СЃРѕР·РґР°Р№С‚Рµ РёС… Рё РІСЃС‚Р°РІСЊС‚Рµ
+	СЃРѕРґРµСЂР¶РёРјРѕРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёС… .txt С„Р°Р№Р»РѕРІ, РёРјРµРЅР° РґРѕР»Р¶РЅС‹ СЃРѕРІРїР°РґР°С‚СЊ):
+	  - SceneEffects          (SceneEffects.txt)         - Р°РЅРёРјР°С†РёРё РїРµСЂРµС…РѕРґРѕРІ
+	  - InventoryController   (InventoryController.txt)  - РёРЅРІРµРЅС‚Р°СЂРё Рё С†РІРµС‚Р°
+	  - ElementMenu           (ElementMenu.txt)          - РёРЅС„Рѕ-С„СЂРµР№РјС‹ СЃС‚РёС…РёР№
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -18,35 +18,35 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
--- Ждём сигнал от загрузочного экрана (StartGameEvent должен быть BindableEvent в ReplicatedStorage)
+-- Р–РґС‘Рј СЃРёРіРЅР°Р» РѕС‚ Р·Р°РіСЂСѓР·РѕС‡РЅРѕРіРѕ СЌРєСЂР°РЅР° (StartGameEvent РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ BindableEvent РІ ReplicatedStorage)
 local startGameEvent = ReplicatedStorage:WaitForChild("StartGameEvent")
 startGameEvent.Event:Wait()
 
 local player = Players.LocalPlayer
--- Ждём, пока сервер создаст StringValue (при спавне персонажа)
-local genderValue = player:WaitForChild("PlayerGender", 10)  -- 10 сек таймаут
+-- Р–РґС‘Рј, РїРѕРєР° СЃРµСЂРІРµСЂ СЃРѕР·РґР°СЃС‚ StringValue (РїСЂРё СЃРїР°РІРЅРµ РїРµСЂСЃРѕРЅР°Р¶Р°)
+local genderValue = player:WaitForChild("PlayerGender", 10)  -- 10 СЃРµРє С‚Р°Р№РјР°СѓС‚
 local playerGui = player:WaitForChild("PlayerGui")
 local mainMenu = playerGui:WaitForChild("MainMenuGui")
 local creationGui = playerGui:WaitForChild("CreationMenuGui")
 
 mainMenu.Enabled = true
--- CreationMenuGui включаем только после инициализации модулей и скрытия
--- панелей (ниже): InventoryController.init делает серию InvokeServer-запросов,
--- и если включить GUI сейчас, всё это время игрок видит редактор целиком
--- (мерцание интерфейса после кнопки Continue)
+-- CreationMenuGui РІРєР»СЋС‡Р°РµРј С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РјРѕРґСѓР»РµР№ Рё СЃРєСЂС‹С‚РёСЏ
+-- РїР°РЅРµР»РµР№ (РЅРёР¶Рµ): InventoryController.init РґРµР»Р°РµС‚ СЃРµСЂРёСЋ InvokeServer-Р·Р°РїСЂРѕСЃРѕРІ,
+-- Рё РµСЃР»Рё РІРєР»СЋС‡РёС‚СЊ GUI СЃРµР№С‡Р°СЃ, РІСЃС‘ СЌС‚Рѕ РІСЂРµРјСЏ РёРіСЂРѕРє РІРёРґРёС‚ СЂРµРґР°РєС‚РѕСЂ С†РµР»РёРєРѕРј
+-- (РјРµСЂС†Р°РЅРёРµ РёРЅС‚РµСЂС„РµР№СЃР° РїРѕСЃР»Рµ РєРЅРѕРїРєРё Continue)
 creationGui.Enabled = false
 
--- ===================== МОДУЛИ =====================
+-- ===================== РњРћР”РЈР›Р =====================
 local SceneEffects = require(ReplicatedStorage:WaitForChild("SceneEffects"))
 local InventoryController = require(ReplicatedStorage:WaitForChild("InventoryController"))
 local ElementMenu = require(ReplicatedStorage:WaitForChild("ElementMenu"))
 
--- ===================== REMOTE ОБЪЕКТЫ =====================
--- ElementChosenEvent и ResetElementChoiceEvent - BindableEvent (клиент->клиент,
--- обмен с HoverBorder2): у RemoteEvent нет ни .Event, ни :Fire()
+-- ===================== REMOTE РћР‘РЄР•РљРўР« =====================
+-- ElementChosenEvent Рё ResetElementChoiceEvent - BindableEvent (РєР»РёРµРЅС‚->РєР»РёРµРЅС‚,
+-- РѕР±РјРµРЅ СЃ HoverBorder2): Сѓ RemoteEvent РЅРµС‚ РЅРё .Event, РЅРё :Fire()
 local ElementChosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
--- ===================== ОСНОВНЫЕ ЭЛЕМЕНТЫ ИНТЕРФЕЙСА =====================
+-- ===================== РћРЎРќРћР’РќР«Р• Р­Р›Р•РњР•РќРўР« РРќРўР•Р Р¤Р•Р™РЎРђ =====================
 local screenGui = script.Parent
 local mainContainer = screenGui:WaitForChild("MainContainer")
 local slot1 = mainContainer:WaitForChild("Slot1")
@@ -73,14 +73,14 @@ local elementMenu = playerGui:WaitForChild("ElementMenuGui")
 local elementButtonContainer = elementMenu:WaitForChild("ButtonContainer")
 local elementBackButton = elementButtonContainer:WaitForChild("BackButton")
 
--- ===================== СОСТОЯНИЕ =====================
+-- ===================== РЎРћРЎРўРћРЇРќРР• =====================
 local isTransitioning = false
 local originalMainPos = mainContainer.Position
--- База камеры должна совпадать со стартовой позицией из CameraLockScript (0, 8, 0),
--- иначе первый переход даёт рывок камеры по высоте
+-- Р‘Р°Р·Р° РєР°РјРµСЂС‹ РґРѕР»Р¶РЅР° СЃРѕРІРїР°РґР°С‚СЊ СЃРѕ СЃС‚Р°СЂС‚РѕРІРѕР№ РїРѕР·РёС†РёРµР№ РёР· CameraLockScript (0, 8, 0),
+-- РёРЅР°С‡Рµ РїРµСЂРІС‹Р№ РїРµСЂРµС…РѕРґ РґР°С‘С‚ СЂС‹РІРѕРє РєР°РјРµСЂС‹ РїРѕ РІС‹СЃРѕС‚Рµ
 local cameraBasePos = Vector3.new(0, 8, 0)
 
--- ===================== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ =====================
+-- ===================== РРќРР¦РРђР›РР—РђР¦РРЇ РњРћР”РЈР›Р•Р™ =====================
 ElementMenu.init({
 	elementMenu = elementMenu,
 	yourChoiceFrame = elementMenu:WaitForChild("YourChoiceFrame"),
@@ -105,7 +105,7 @@ SceneEffects.init({
 	bgRightOriginalPos = bgRightOriginalPos,
 })
 
--- Изначально скрываем элементы редактора
+-- РР·РЅР°С‡Р°Р»СЊРЅРѕ СЃРєСЂС‹РІР°РµРј СЌР»РµРјРµРЅС‚С‹ СЂРµРґР°РєС‚РѕСЂР°
 buttonContainer.Visible = false
 customizeLeft.Visible = false
 customizeRight.Visible = false
@@ -113,12 +113,12 @@ customizeText.Visible = false
 leftRight.Visible = false
 randomFrame.Visible = false
 elementMenu.Enabled = false
--- Панели спрятаны до включения GUI: включаем только теперь, иначе после
--- Continue редактор успевает вспыхнуть на экране до того, как панели
--- уедут на стартовые позиции за пределы экрана
+-- РџР°РЅРµР»Рё СЃРїСЂСЏС‚Р°РЅС‹ РґРѕ РІРєР»СЋС‡РµРЅРёСЏ GUI: РІРєР»СЋС‡Р°РµРј С‚РѕР»СЊРєРѕ С‚РµРїРµСЂСЊ, РёРЅР°С‡Рµ РїРѕСЃР»Рµ
+-- Continue СЂРµРґР°РєС‚РѕСЂ СѓСЃРїРµРІР°РµС‚ РІСЃРїС‹С…РЅСѓС‚СЊ РЅР° СЌРєСЂР°РЅРµ РґРѕ С‚РѕРіРѕ, РєР°Рє РїР°РЅРµР»Рё
+-- СѓРµРґСѓС‚ РЅР° СЃС‚Р°СЂС‚РѕРІС‹Рµ РїРѕР·РёС†РёРё Р·Р° РїСЂРµРґРµР»С‹ СЌРєСЂР°РЅР°
 creationGui.Enabled = true
 
--- ===================== СМЕНА ПОЛА =====================
+-- ===================== РЎРњР•РќРђ РџРћР›Рђ =====================
 local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")
 
 local genderFrame = customizeLeft:WaitForChild("Frame"):WaitForChild("Gender")
@@ -140,52 +140,52 @@ local function updateGenderButtons(selectedGender)
 	end
 end
 
--- Первичная подсветка и слежение из StringValue.
--- genderValue может быть nil (таймаут WaitForChild) — тогда просто работаем без автоподсветки
+-- РџРµСЂРІРёС‡РЅР°СЏ РїРѕРґСЃРІРµС‚РєР° Рё СЃР»РµР¶РµРЅРёРµ РёР· StringValue.
+-- genderValue РјРѕР¶РµС‚ Р±С‹С‚СЊ nil (С‚Р°Р№РјР°СѓС‚ WaitForChild) вЂ” С‚РѕРіРґР° РїСЂРѕСЃС‚Рѕ СЂР°Р±РѕС‚Р°РµРј Р±РµР· Р°РІС‚РѕРїРѕРґСЃРІРµС‚РєРё
 if genderValue then
 	updateGenderButtons(genderValue.Value)
-	-- Слушаем изменения пола (если он меняется не только по кнопке, но и с сервера)
+	-- РЎР»СѓС€Р°РµРј РёР·РјРµРЅРµРЅРёСЏ РїРѕР»Р° (РµСЃР»Рё РѕРЅ РјРµРЅСЏРµС‚СЃСЏ РЅРµ С‚РѕР»СЊРєРѕ РїРѕ РєРЅРѕРїРєРµ, РЅРѕ Рё СЃ СЃРµСЂРІРµСЂР°)
 	genderValue.Changed:Connect(function(newValue)
 		updateGenderButtons(newValue)
 	end)
 else
-	warn("PlayerGender не пришёл за 10 сек - подсветка пола с сервера отключена")
+	warn("PlayerGender РЅРµ РїСЂРёС€С‘Р» Р·Р° 10 СЃРµРє - РїРѕРґСЃРІРµС‚РєР° РїРѕР»Р° СЃ СЃРµСЂРІРµСЂР° РѕС‚РєР»СЋС‡РµРЅР°")
 end
 
--- Запрос смены пола на сервер
+-- Р—Р°РїСЂРѕСЃ СЃРјРµРЅС‹ РїРѕР»Р° РЅР° СЃРµСЂРІРµСЂ
 local function applyGender(gender)
 	if gender == "male" or gender == "female" then
 		changeGenderEvent:FireServer(gender)
-		-- Мгновенно подсвечиваем кнопку для отзывчивости интерфейса
+		-- РњРіРЅРѕРІРµРЅРЅРѕ РїРѕРґСЃРІРµС‡РёРІР°РµРј РєРЅРѕРїРєСѓ РґР»СЏ РѕС‚Р·С‹РІС‡РёРІРѕСЃС‚Рё РёРЅС‚РµСЂС„РµР№СЃР°
 		updateGenderButtons(gender)
-		print("Запрос на смену пола отправлен: " .. gender)
+		print("Р—Р°РїСЂРѕСЃ РЅР° СЃРјРµРЅСѓ РїРѕР»Р° РѕС‚РїСЂР°РІР»РµРЅ: " .. gender)
 	else
-		warn("Неизвестный пол: " .. tostring(gender))
+		warn("РќРµРёР·РІРµСЃС‚РЅС‹Р№ РїРѕР»: " .. tostring(gender))
 	end
 end
 
--- Activated вместо MouseButton1Click: работает и с геймпадом/тачем (M3)
+-- Activated РІРјРµСЃС‚Рѕ MouseButton1Click: СЂР°Р±РѕС‚Р°РµС‚ Рё СЃ РіРµР№РјРїР°РґРѕРј/С‚Р°С‡РµРј (M3)
 maleButton.Activated:Connect(function() applyGender("male") end)
 femaleButton.Activated:Connect(function() applyGender("female") end)
 
--- ===================== СБОЙ ТЕЛЕПОРТАЦИИ =====================
--- Финальный переход прячет все меню ещё до запроса телепортации. Если
--- TeleportAsync падает (сервер в Teleport.txt только предупреждает), игрок
--- остаётся в этом плейсе без интерфейса. TeleportInitFailed приходит и на
--- клиент — восстанавливаем меню стихий, фон и камеру.
--- restoreAfterTeleportFailure назначается в transitionToFinal.
+-- ===================== РЎР‘РћР™ РўР•Р›Р•РџРћР РўРђР¦РР =====================
+-- Р¤РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ РїСЂСЏС‡РµС‚ РІСЃРµ РјРµРЅСЋ РµС‰С‘ РґРѕ Р·Р°РїСЂРѕСЃР° С‚РµР»РµРїРѕСЂС‚Р°С†РёРё. Р•СЃР»Рё
+-- TeleportAsync РїР°РґР°РµС‚ (СЃРµСЂРІРµСЂ РІ Teleport.txt С‚РѕР»СЊРєРѕ РїСЂРµРґСѓРїСЂРµР¶РґР°РµС‚), РёРіСЂРѕРє
+-- РѕСЃС‚Р°С‘С‚СЃСЏ РІ СЌС‚РѕРј РїР»РµР№СЃРµ Р±РµР· РёРЅС‚РµСЂС„РµР№СЃР°. TeleportInitFailed РїСЂРёС…РѕРґРёС‚ Рё РЅР°
+-- РєР»РёРµРЅС‚ вЂ” РІРѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµРј РјРµРЅСЋ СЃС‚РёС…РёР№, С„РѕРЅ Рё РєР°РјРµСЂСѓ.
+-- restoreAfterTeleportFailure РЅР°Р·РЅР°С‡Р°РµС‚СЃСЏ РІ transitionToFinal.
 local restoreAfterTeleportFailure = nil
 
 TeleportService.TeleportInitFailed:Connect(function(_player, teleportResult, errorMessage)
-	warn("Телепортация не удалась: " .. tostring(teleportResult) .. " (" .. tostring(errorMessage) .. ")")
+	warn("РўРµР»РµРїРѕСЂС‚Р°С†РёСЏ РЅРµ СѓРґР°Р»Р°СЃСЊ: " .. tostring(teleportResult) .. " (" .. tostring(errorMessage) .. ")")
 	if restoreAfterTeleportFailure then
 		restoreAfterTeleportFailure()
 	end
 end)
 
--- ===================== ПЕРЕХОДЫ =====================
+-- ===================== РџР•Р Р•РҐРћР”Р« =====================
 
--- Возврат из редактора в главное меню (кнопка Back)
+-- Р’РѕР·РІСЂР°С‚ РёР· СЂРµРґР°РєС‚РѕСЂР° РІ РіР»Р°РІРЅРѕРµ РјРµРЅСЋ (РєРЅРѕРїРєР° Back)
 local function returnToMenu()
 	if isTransitioning then return end
 	InventoryController.closeAll()
@@ -196,8 +196,8 @@ local function returnToMenu()
 
 	SceneEffects.hideCreationUI()
 
-	-- Камера возвращается к прямому виду; разблокируем переход только после её окончания
-	-- (раньше разблокировка происходила по панелям через 0.8с, а камера летит 1.0с)
+	-- РљР°РјРµСЂР° РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ Рє РїСЂСЏРјРѕРјСѓ РІРёРґСѓ; СЂР°Р·Р±Р»РѕРєРёСЂСѓРµРј РїРµСЂРµС…РѕРґ С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ РµС‘ РѕРєРѕРЅС‡Р°РЅРёСЏ
+	-- (СЂР°РЅСЊС€Рµ СЂР°Р·Р±Р»РѕРєРёСЂРѕРІРєР° РїСЂРѕРёСЃС…РѕРґРёР»Р° РїРѕ РїР°РЅРµР»СЏРј С‡РµСЂРµР· 0.8СЃ, Р° РєР°РјРµСЂР° Р»РµС‚РёС‚ 1.0СЃ)
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, 0, 1.0)
 	if not tweenCam then
 		isTransitioning = false
@@ -210,7 +210,7 @@ local function returnToMenu()
 	end)
 end
 
--- Переход из главного меню в редактор (слоты Slot1/Slot2)
+-- РџРµСЂРµС…РѕРґ РёР· РіР»Р°РІРЅРѕРіРѕ РјРµРЅСЋ РІ СЂРµРґР°РєС‚РѕСЂ (СЃР»РѕС‚С‹ Slot1/Slot2)
 local function transitionToCreation()
 	if isTransitioning then return end
 	isTransitioning = true
@@ -221,7 +221,7 @@ local function transitionToCreation()
 
 	SceneEffects.showCreationUI()
 
-	-- Камера поворачивается ВЛЕВО на 90° (вид редактора)
+	-- РљР°РјРµСЂР° РїРѕРІРѕСЂР°С‡РёРІР°РµС‚СЃСЏ Р’Р›Р•Р’Рћ РЅР° 90В° (РІРёРґ СЂРµРґР°РєС‚РѕСЂР°)
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, 0, -math.pi/2, 1.0)
 	if not tweenCam then
 		isTransitioning = false
@@ -234,22 +234,22 @@ local function transitionToCreation()
 	end)
 end
 
--- Переход из редактора в меню стихий (кнопка Next)
+-- РџРµСЂРµС…РѕРґ РёР· СЂРµРґР°РєС‚РѕСЂР° РІ РјРµРЅСЋ СЃС‚РёС…РёР№ (РєРЅРѕРїРєР° Next)
 local function transitionFromCreation()
 	if isTransitioning then return end
 	isTransitioning = true
 
-	-- Закрываем инвентари и палитры
+	-- Р—Р°РєСЂС‹РІР°РµРј РёРЅРІРµРЅС‚Р°СЂРё Рё РїР°Р»РёС‚СЂС‹
 	InventoryController.closeAll()
 
-	-- ===== Скрываем CreationMenuGui (аналогично кнопке Back) =====
+	-- ===== РЎРєСЂС‹РІР°РµРј CreationMenuGui (Р°РЅР°Р»РѕРіРёС‡РЅРѕ РєРЅРѕРїРєРµ Back) =====
 	SceneEffects.hideCreationUI()
 
-	-- ===== Появление ElementMenuGui =====
+	-- ===== РџРѕСЏРІР»РµРЅРёРµ ElementMenuGui =====
 	SceneEffects.showElementMenu()
 	ElementMenu.setInputEnabled(true)
 
-	-- ===== Анимация камеры: поворот ВПРАВО на 90° (от -pi/2 к -pi) =====
+	-- ===== РђРЅРёРјР°С†РёСЏ РєР°РјРµСЂС‹: РїРѕРІРѕСЂРѕС‚ Р’РџР РђР’Рћ РЅР° 90В° (РѕС‚ -pi/2 Рє -pi) =====
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, -math.pi, 1.0)
 	if not tweenCam then
 		isTransitioning = false
@@ -257,37 +257,37 @@ local function transitionFromCreation()
 	end
 	tweenCam.Completed:Connect(function(playbackState)
 		if playbackState == Enum.PlaybackState.Completed then
-			isTransitioning = false   -- разблокируем только после полного завершения камеры
+			isTransitioning = false   -- СЂР°Р·Р±Р»РѕРєРёСЂСѓРµРј С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ РїРѕР»РЅРѕРіРѕ Р·Р°РІРµСЂС€РµРЅРёСЏ РєР°РјРµСЂС‹
 		end
 	end)
 
-	-- Появление YourChoiceFrame
+	-- РџРѕСЏРІР»РµРЅРёРµ YourChoiceFrame
 	SceneEffects.showYourChoiceFrame()
 end
 
--- Обратный переход: ElementMenu > CreationMenu (кнопка Back в меню стихий)
+-- РћР±СЂР°С‚РЅС‹Р№ РїРµСЂРµС…РѕРґ: ElementMenu > CreationMenu (РєРЅРѕРїРєР° Back РІ РјРµРЅСЋ СЃС‚РёС…РёР№)
 local function transitionBackToCreation()
 	if isTransitioning then return end
 	isTransitioning = true
-	-- Панели меню стихий уезжают ~0.8с, всё это время GUI ещё активен:
-	-- блокируем кнопки стихий, чтобы клик в этом окне не испортил состояние
+	-- РџР°РЅРµР»Рё РјРµРЅСЋ СЃС‚РёС…РёР№ СѓРµР·Р¶Р°СЋС‚ ~0.8СЃ, РІСЃС‘ СЌС‚Рѕ РІСЂРµРјСЏ GUI РµС‰С‘ Р°РєС‚РёРІРµРЅ:
+	-- Р±Р»РѕРєРёСЂСѓРµРј РєРЅРѕРїРєРё СЃС‚РёС…РёР№, С‡С‚РѕР±С‹ РєР»РёРє РІ СЌС‚РѕРј РѕРєРЅРµ РЅРµ РёСЃРїРѕСЂС‚РёР» СЃРѕСЃС‚РѕСЏРЅРёРµ
 	ElementMenu.setInputEnabled(false)
 
-	-- Закрываем все открытые инвентари (на всякий случай)
+	-- Р—Р°РєСЂС‹РІР°РµРј РІСЃРµ РѕС‚РєСЂС‹С‚С‹Рµ РёРЅРІРµРЅС‚Р°СЂРё (РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№)
 	InventoryController.closeAll()
 
 	local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
 	resetChoiceEvent:Fire()
 
-	-- === Плавно убираем открытый инфо-фрейм стихии (если есть) ===
+	-- === РџР»Р°РІРЅРѕ СѓР±РёСЂР°РµРј РѕС‚РєСЂС‹С‚С‹Р№ РёРЅС„Рѕ-С„СЂРµР№Рј СЃС‚РёС…РёРё (РµСЃР»Рё РµСЃС‚СЊ) ===
 	ElementMenu.closeOpenInfoFrame(0.5, true)
 
-	-- === Убираем ElementMenuGui и возвращаем редактор ===
-	-- (onHidden больше не разблокирует переход: ждём окончания камеры, см. ниже)
+	-- === РЈР±РёСЂР°РµРј ElementMenuGui Рё РІРѕР·РІСЂР°С‰Р°РµРј СЂРµРґР°РєС‚РѕСЂ ===
+	-- (onHidden Р±РѕР»СЊС€Рµ РЅРµ СЂР°Р·Р±Р»РѕРєРёСЂСѓРµС‚ РїРµСЂРµС…РѕРґ: Р¶РґС‘Рј РѕРєРѕРЅС‡Р°РЅРёСЏ РєР°РјРµСЂС‹, СЃРј. РЅРёР¶Рµ)
 	SceneEffects.hideElementMenu({ yourChoice = "hide" })
 	SceneEffects.showCreationUI()
 
-	-- Камера назад в редактор; разблокируем переход только после её окончания
+	-- РљР°РјРµСЂР° РЅР°Р·Р°Рґ РІ СЂРµРґР°РєС‚РѕСЂ; СЂР°Р·Р±Р»РѕРєРёСЂСѓРµРј РїРµСЂРµС…РѕРґ С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ РµС‘ РѕРєРѕРЅС‡Р°РЅРёСЏ
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi, -math.pi/2, 1.0)
 	if not tweenCam then
 		isTransitioning = false
@@ -300,31 +300,31 @@ local function transitionBackToCreation()
 	end)
 end
 
--- Финальный переход из меню стихий (выбор сделан)
+-- Р¤РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ РёР· РјРµРЅСЋ СЃС‚РёС…РёР№ (РІС‹Р±РѕСЂ СЃРґРµР»Р°РЅ)
 local function transitionToFinal(chosenElement)
 	if isTransitioning then return end
 	isTransitioning = true
-	-- Блокируем кнопки стихий на время перехода (GUI активен ещё ~0.8с)
+	-- Р‘Р»РѕРєРёСЂСѓРµРј РєРЅРѕРїРєРё СЃС‚РёС…РёР№ РЅР° РІСЂРµРјСЏ РїРµСЂРµС…РѕРґР° (GUI Р°РєС‚РёРІРµРЅ РµС‰С‘ ~0.8СЃ)
 	ElementMenu.setInputEnabled(false)
 
-	-- Закрываем все инвентари/палитры
+	-- Р—Р°РєСЂС‹РІР°РµРј РІСЃРµ РёРЅРІРµРЅС‚Р°СЂРё/РїР°Р»РёС‚СЂС‹
 	InventoryController.closeAll()
 
-	-- === EntranceGui нужен для перехода: проверяем ДО скрытия меню ===
-	-- Иначе при отсутствии экземпляра WaitForChild висит вечно, а меню уже
-	-- спрятаны - игровой процесс заблокирован навсегда (bugs_2.md, L4)
+	-- === EntranceGui РЅСѓР¶РµРЅ РґР»СЏ РїРµСЂРµС…РѕРґР°: РїСЂРѕРІРµСЂСЏРµРј Р”Рћ СЃРєСЂС‹С‚РёСЏ РјРµРЅСЋ ===
+	-- РРЅР°С‡Рµ РїСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё СЌРєР·РµРјРїР»СЏСЂР° WaitForChild РІРёСЃРёС‚ РІРµС‡РЅРѕ, Р° РјРµРЅСЋ СѓР¶Рµ
+	-- СЃРїСЂСЏС‚Р°РЅС‹ - РёРіСЂРѕРІРѕР№ РїСЂРѕС†РµСЃСЃ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ РЅР°РІСЃРµРіРґР° (bugs_2.md, L4)
 	local entranceGui = playerGui:WaitForChild("EntranceGui", 10)
 	local entranceBackFrame = entranceGui and entranceGui:FindFirstChild("BackFrame")
 	local entranceFrame = entranceGui and entranceGui:FindFirstChild("Frame")
 	if not entranceBackFrame or not entranceFrame then
-		warn("EntranceGui/BackFrame/Frame не найдены - финальный переход отменён")
+		warn("EntranceGui/BackFrame/Frame РЅРµ РЅР°Р№РґРµРЅС‹ - С„РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ РѕС‚РјРµРЅС‘РЅ")
 		ElementMenu.setInputEnabled(true)
 		isTransitioning = false
 		return
 	end
 
-	-- === Восстановление после неудачной телепортации (bugs_2.md, M2) ===
-	-- Возвращаем фон, меню стихий (выбор в HoverBorder2 сохранён) и камеру
+	-- === Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РїРѕСЃР»Рµ РЅРµСѓРґР°С‡РЅРѕР№ С‚РµР»РµРїРѕСЂС‚Р°С†РёРё (bugs_2.md, M2) ===
+	-- Р’РѕР·РІСЂР°С‰Р°РµРј С„РѕРЅ, РјРµРЅСЋ СЃС‚РёС…РёР№ (РІС‹Р±РѕСЂ РІ HoverBorder2 СЃРѕС…СЂР°РЅС‘РЅ) Рё РєР°РјРµСЂСѓ
 	restoreAfterTeleportFailure = function()
 		local backInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		TweenService:Create(bgLeft, backInfo,
@@ -338,22 +338,22 @@ local function transitionToFinal(chosenElement)
 		SceneEffects.tweenCameraYaw(cameraBasePos, -3 * math.pi / 2, -math.pi, 1.0)
 	end
 
-	-- === Скрываем ElementMenuGui ===
+	-- === РЎРєСЂС‹РІР°РµРј ElementMenuGui ===
 	SceneEffects.hideElementMenu({ yourChoice = "slide" })
 
-	-- Убираем открытый инфо-фрейм, если остался
+	-- РЈР±РёСЂР°РµРј РѕС‚РєСЂС‹С‚С‹Р№ РёРЅС„Рѕ-С„СЂРµР№Рј, РµСЃР»Рё РѕСЃС‚Р°Р»СЃСЏ
 	ElementMenu.closeOpenInfoFrame(0.5, false)
 
-	-- === Фоновые панели MainMenuGui разлетаются в стороны ===
+	-- === Р¤РѕРЅРѕРІС‹Рµ РїР°РЅРµР»Рё MainMenuGui СЂР°Р·Р»РµС‚Р°СЋС‚СЃСЏ РІ СЃС‚РѕСЂРѕРЅС‹ ===
 	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(bgLeft, tweenInfo,
 		{Position = UDim2.new(-2, 0, 0.5, 0)}):Play()
 	TweenService:Create(bgRight, tweenInfo,
 		{Position = UDim2.new(2, 0, 0.5, 0)}):Play()
 
-	-- Прозрачность нужно менять и у детей: BackgroundTransparency родителя на них
-	-- не действует, и при включении GUI они вспыхнули бы раньше твина.
-	-- Запоминаем исходные значения и прячем всё ДО включения GUI.
+	-- РџСЂРѕР·СЂР°С‡РЅРѕСЃС‚СЊ РЅСѓР¶РЅРѕ РјРµРЅСЏС‚СЊ Рё Сѓ РґРµС‚РµР№: BackgroundTransparency СЂРѕРґРёС‚РµР»СЏ РЅР° РЅРёС…
+	-- РЅРµ РґРµР№СЃС‚РІСѓРµС‚, Рё РїСЂРё РІРєР»СЋС‡РµРЅРёРё GUI РѕРЅРё РІСЃРїС‹С…РЅСѓР»Рё Р±С‹ СЂР°РЅСЊС€Рµ С‚РІРёРЅР°.
+	-- Р—Р°РїРѕРјРёРЅР°РµРј РёСЃС…РѕРґРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ Рё РїСЂСЏС‡РµРј РІСЃС‘ Р”Рћ РІРєР»СЋС‡РµРЅРёСЏ GUI.
 	local entranceFadeTargets = {}
 	local function collectAndHideFade(obj)
 		local props = nil
@@ -385,10 +385,10 @@ local function transitionToFinal(chosenElement)
 	for _, desc in ipairs(entranceFrame:GetDescendants()) do collectAndHideFade(desc) end
 	entranceGui.Enabled = true
 
-	-- === Поворот и подъём камеры ===
+	-- === РџРѕРІРѕСЂРѕС‚ Рё РїРѕРґСЉС‘Рј РєР°РјРµСЂС‹ ===
 	local camera = workspace.CurrentCamera
 	if not camera then
-		warn("CurrentCamera отсутствует - финальный переход отменён")
+		warn("CurrentCamera РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ - С„РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ РѕС‚РјРµРЅС‘РЅ")
 		restoreAfterTeleportFailure()
 		isTransitioning = false
 		return
@@ -402,7 +402,7 @@ local function transitionToFinal(chosenElement)
 
 	local heightVal = Instance.new("NumberValue")
 	heightVal.Value = 0
-	local targetHeight = 3   -- подъём на 3 студита
+	local targetHeight = 3   -- РїРѕРґСЉС‘Рј РЅР° 3 СЃС‚СѓРґРёС‚Р°
 
 	local function updateCamera()
 		camera.CFrame = CFrame.new(cameraBasePos + Vector3.new(0, heightVal.Value, 0))
@@ -425,10 +425,10 @@ local function transitionToFinal(chosenElement)
 	tweenAngle.Completed:Connect(function(playbackState)
 		if playbackState ~= Enum.PlaybackState.Completed then return end
 
-		-- Пауза после поворота/подъёма
+		-- РџР°СѓР·Р° РїРѕСЃР»Рµ РїРѕРІРѕСЂРѕС‚Р°/РїРѕРґСЉС‘РјР°
 		task.wait(0.5)
 
-		-- Движение вперёд
+		-- Р”РІРёР¶РµРЅРёРµ РІРїРµСЂС‘Рґ
 		local forwardDistance = 30
 		local targetCFrame = camera.CFrame * CFrame.new(0, 0, -forwardDistance)
 
@@ -437,11 +437,11 @@ local function transitionToFinal(chosenElement)
 			{CFrame = targetCFrame})
 		tweenForward:Play()
 
-		-- Примерно в конце движения (через 0.6 секунды) начинаем проявлять EntranceGui
+		-- РџСЂРёРјРµСЂРЅРѕ РІ РєРѕРЅС†Рµ РґРІРёР¶РµРЅРёСЏ (С‡РµСЂРµР· 0.6 СЃРµРєСѓРЅРґС‹) РЅР°С‡РёРЅР°РµРј РїСЂРѕСЏРІР»СЏС‚СЊ EntranceGui
 		task.spawn(function()
 			task.wait(0.6)
 			local appearInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			-- Проявляем и сами фреймы, и их детей (каждый к своей исходной прозрачности)
+			-- РџСЂРѕСЏРІР»СЏРµРј Рё СЃР°РјРё С„СЂРµР№РјС‹, Рё РёС… РґРµС‚РµР№ (РєР°Р¶РґС‹Р№ Рє СЃРІРѕРµР№ РёСЃС…РѕРґРЅРѕР№ РїСЂРѕР·СЂР°С‡РЅРѕСЃС‚Рё)
 			for obj, props in pairs(entranceFadeTargets) do
 				TweenService:Create(obj, appearInfo, props):Play()
 			end
@@ -452,34 +452,34 @@ local function transitionToFinal(chosenElement)
 			angleVal:Destroy()
 			heightVal:Destroy()
 			isTransitioning = false
-			print("Финальный переход завершён. Элемент:", chosenElement)
+			print("Р¤РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ Р·Р°РІРµСЂС€С‘РЅ. Р­Р»РµРјРµРЅС‚:", chosenElement)
 
-			-- Телепортируем только когда анимация полностью доиграла:
-			-- раньше запрос уходил на 0.7с раньше окончания движения и проявления
+			-- РўРµР»РµРїРѕСЂС‚РёСЂСѓРµРј С‚РѕР»СЊРєРѕ РєРѕРіРґР° Р°РЅРёРјР°С†РёСЏ РїРѕР»РЅРѕСЃС‚СЊСЋ РґРѕРёРіСЂР°Р»Р°:
+			-- СЂР°РЅСЊС€Рµ Р·Р°РїСЂРѕСЃ СѓС…РѕРґРёР» РЅР° 0.7СЃ СЂР°РЅСЊС€Рµ РѕРєРѕРЅС‡Р°РЅРёСЏ РґРІРёР¶РµРЅРёСЏ Рё РїСЂРѕСЏРІР»РµРЅРёСЏ
 			-- EntranceGui (bugs_2.md, L5)
 			local requestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport", 10)
 			if requestTeleport then
-				requestTeleport:FireServer(chosenElement) -- chosenElement - имя выбранной стихии
+				requestTeleport:FireServer(chosenElement) -- chosenElement - РёРјСЏ РІС‹Р±СЂР°РЅРЅРѕР№ СЃС‚РёС…РёРё
 			else
-				warn("RequestTeleport не найден - возврат в меню стихий")
+				warn("RequestTeleport РЅРµ РЅР°Р№РґРµРЅ - РІРѕР·РІСЂР°С‚ РІ РјРµРЅСЋ СЃС‚РёС…РёР№")
 				restoreAfterTeleportFailure()
 			end
 		end)
 	end)
 end
 
--- ===================== ПОДКЛЮЧЕНИЕ КНОПОК И СОБЫТИЙ =====================
+-- ===================== РџРћР”РљР›Р®Р§Р•РќРР• РљРќРћРџРћРљ Р РЎРћР‘Р«РўРР™ =====================
 slot1.Activated:Connect(transitionToCreation)
 slot2.Activated:Connect(transitionToCreation)
 backBtn.Activated:Connect(returnToMenu)
 nextBtn.Activated:Connect(transitionFromCreation)
 
--- Кнопка Back в меню стихий
+-- РљРЅРѕРїРєР° Back РІ РјРµРЅСЋ СЃС‚РёС…РёР№
 elementBackButton.Activated:Connect(transitionBackToCreation)
 
 ElementChosenEvent.Event:Connect(function(elementName)
-	print("Выбрана стихия:", elementName, "– выполняю финальный переход.")
+	print("Р’С‹Р±СЂР°РЅР° СЃС‚РёС…РёСЏ:", elementName, "вЂ“ РІС‹РїРѕР»РЅСЏСЋ С„РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ.")
 	transitionToFinal(elementName)
 end)
 
-print("Система управления инвентарями, цвета и рандомайзер готова!")
+print("РЎРёСЃС‚РµРјР° СѓРїСЂР°РІР»РµРЅРёСЏ РёРЅРІРµРЅС‚Р°СЂСЏРјРё, С†РІРµС‚Р° Рё СЂР°РЅРґРѕРјР°Р№Р·РµСЂ РіРѕС‚РѕРІР°!")

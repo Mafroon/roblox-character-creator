@@ -1,38 +1,38 @@
 --[[
-    ServerInventory – Полная версия с исправлениями.
-    Использует _G для синхронизации цвета кожи, ожидает Head вместо задержек.
-    Поместить в ServerScriptService.
+    ServerInventory вЂ“ РџРѕР»РЅР°СЏ РІРµСЂСЃРёСЏ СЃ РёСЃРїСЂР°РІР»РµРЅРёСЏРјРё.
+    РСЃРїРѕР»СЊР·СѓРµС‚ _G РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё С†РІРµС‚Р° РєРѕР¶Рё, РѕР¶РёРґР°РµС‚ Head РІРјРµСЃС‚Рѕ Р·Р°РґРµСЂР¶РµРє.
+    РџРѕРјРµСЃС‚РёС‚СЊ РІ ServerScriptService.
 
-    Требует в ReplicatedStorage RemoteFunction "GetEquippedItems" - снимок
-    надетых предметов и цветов категорий для клиента (InventoryController.init).
+    РўСЂРµР±СѓРµС‚ РІ ReplicatedStorage RemoteFunction "GetEquippedItems" - СЃРЅРёРјРѕРє
+    РЅР°РґРµС‚С‹С… РїСЂРµРґРјРµС‚РѕРІ Рё С†РІРµС‚РѕРІ РєР°С‚РµРіРѕСЂРёР№ РґР»СЏ РєР»РёРµРЅС‚Р° (InventoryController.init).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
--- ===================== ХРАНИЛИЩА =====================
+-- ===================== РҐР РђРќРР›РР©Рђ =====================
 local equippedItems = {}           -- [player] = { [category] = {item, ...} }
-local categoryColors = {}          -- [player] = { [category] = Color3 } - выбранные цвета категорий
-_G.PlayerSkinColors = _G.PlayerSkinColors or {}   -- Глобальная таблица для синхронизации
+local categoryColors = {}          -- [player] = { [category] = Color3 } - РІС‹Р±СЂР°РЅРЅС‹Рµ С†РІРµС‚Р° РєР°С‚РµРіРѕСЂРёР№
+_G.PlayerSkinColors = _G.PlayerSkinColors or {}   -- Р“Р»РѕР±Р°Р»СЊРЅР°СЏ С‚Р°Р±Р»РёС†Р° РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё
 
--- ===================== REMOTE ОБЪЕКТЫ =====================
--- StartGameEvent здесь НЕ подключаем: это BindableEvent, он не пересекает
--- границу клиент/сервер, серверное подключение никогда бы не сработало
+-- ===================== REMOTE РћР‘РЄР•РљРўР« =====================
+-- StartGameEvent Р·РґРµСЃСЊ РќР• РїРѕРґРєР»СЋС‡Р°РµРј: СЌС‚Рѕ BindableEvent, РѕРЅ РЅРµ РїРµСЂРµСЃРµРєР°РµС‚
+-- РіСЂР°РЅРёС†Сѓ РєР»РёРµРЅС‚/СЃРµСЂРІРµСЂ, СЃРµСЂРІРµСЂРЅРѕРµ РїРѕРґРєР»СЋС‡РµРЅРёРµ РЅРёРєРѕРіРґР° Р±С‹ РЅРµ СЃСЂР°Р±РѕС‚Р°Р»Рѕ
 local equipEvent = ReplicatedStorage:WaitForChild("EquipItem")
 local getItemsFunction = ReplicatedStorage:WaitForChild("GetInventoryItems")
 local changeColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
 local getEquippedFunction = ReplicatedStorage:WaitForChild("GetEquippedItems")
 
--- ===================== БЕЗОПАСНОСТЬ =====================
--- Белый список категорий: без него любая папка ServerStorage (Gender, Animations...)
--- проходит как "категория", и в персонажа клонируют целый риг
+-- ===================== Р‘Р•Р—РћРџРђРЎРќРћРЎРўР¬ =====================
+-- Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№: Р±РµР· РЅРµРіРѕ Р»СЋР±Р°СЏ РїР°РїРєР° ServerStorage (Gender, Animations...)
+-- РїСЂРѕС…РѕРґРёС‚ РєР°Рє "РєР°С‚РµРіРѕСЂРёСЏ", Рё РІ РїРµСЂСЃРѕРЅР°Р¶Р° РєР»РѕРЅРёСЂСѓСЋС‚ С†РµР»С‹Р№ СЂРёРі
 local VALID_EQUIP_CATEGORIES = {
 	Shirt = true, Pants = true, Eyes = true, Mouth = true,
 	Hair = true, FacialHair = true, Extra = true, Race = true,
 }
 
--- ===================== ЦВЕТОВЫЕ ПАЛИТРЫ =====================
+-- ===================== Р¦Р’Р•РўРћР’Р«Р• РџРђР›РРўР Р« =====================
 local pleasantColors = {
 	Color3.fromRGB(255, 179, 186), Color3.fromRGB(255, 223, 186),
 	Color3.fromRGB(255, 255, 186), Color3.fromRGB(186, 255, 201),
@@ -63,12 +63,12 @@ local function getPleasantColor(rng, accentChance)
 	end
 end
 
--- Применение цвета к категории (и запоминание для будущих перевдеваний)
+-- РџСЂРёРјРµРЅРµРЅРёРµ С†РІРµС‚Р° Рє РєР°С‚РµРіРѕСЂРёРё (Рё Р·Р°РїРѕРјРёРЅР°РЅРёРµ РґР»СЏ Р±СѓРґСѓС‰РёС… РїРµСЂРµРІРґРµРІР°РЅРёР№)
 local function applyCategoryColor(player, category, color)
 	local char = player.Character
 	if not char then return end
 
-	-- Запоминаем цвет: equipSingleItem/applyRace вернут его при переэкипировке категории
+	-- Р—Р°РїРѕРјРёРЅР°РµРј С†РІРµС‚: equipSingleItem/applyRace РІРµСЂРЅСѓС‚ РµРіРѕ РїСЂРё РїРµСЂРµСЌРєРёРїРёСЂРѕРІРєРµ РєР°С‚РµРіРѕСЂРёРё
 	categoryColors[player] = categoryColors[player] or {}
 	categoryColors[player][category] = color
 
@@ -111,7 +111,7 @@ local function applyCategoryColor(player, category, color)
 	end
 end
 
--- Удаляет все предметы категории с персонажа и из таблицы equippedItems
+-- РЈРґР°Р»СЏРµС‚ РІСЃРµ РїСЂРµРґРјРµС‚С‹ РєР°С‚РµРіРѕСЂРёРё СЃ РїРµСЂСЃРѕРЅР°Р¶Р° Рё РёР· С‚Р°Р±Р»РёС†С‹ equippedItems
 local function unequipCategory(player, category)
 	local char = player.Character
 	if not char then return end
@@ -135,8 +135,8 @@ local function unequipCategory(player, category)
 	end
 end
 
--- Надевает один предмет (заменяет предыдущие в категории).
--- Возвращает true, если предмет реально надет (иначе эхо клиенту не отправляем)
+-- РќР°РґРµРІР°РµС‚ РѕРґРёРЅ РїСЂРµРґРјРµС‚ (Р·Р°РјРµРЅСЏРµС‚ РїСЂРµРґС‹РґСѓС‰РёРµ РІ РєР°С‚РµРіРѕСЂРёРё).
+-- Р’РѕР·РІСЂР°С‰Р°РµС‚ true, РµСЃР»Рё РїСЂРµРґРјРµС‚ СЂРµР°Р»СЊРЅРѕ РЅР°РґРµС‚ (РёРЅР°С‡Рµ СЌС…Рѕ РєР»РёРµРЅС‚Сѓ РЅРµ РѕС‚РїСЂР°РІР»СЏРµРј)
 local function equipSingleItem(player, item, category)
 	local char = player.Character
 	if not char then return false end
@@ -146,8 +146,8 @@ local function equipSingleItem(player, item, category)
 	local clone = item:Clone()
 	clone.Parent = char
 
-	-- Возвращаем предмету последний выбранный цвет этой категории
-	-- (иначе переэкипировка сбрасывает цвет на шаблонный)
+	-- Р’РѕР·РІСЂР°С‰Р°РµРј РїСЂРµРґРјРµС‚Сѓ РїРѕСЃР»РµРґРЅРёР№ РІС‹Р±СЂР°РЅРЅС‹Р№ С†РІРµС‚ СЌС‚РѕР№ РєР°С‚РµРіРѕСЂРёРё
+	-- (РёРЅР°С‡Рµ РїРµСЂРµСЌРєРёРїРёСЂРѕРІРєР° СЃР±СЂР°СЃС‹РІР°РµС‚ С†РІРµС‚ РЅР° С€Р°Р±Р»РѕРЅРЅС‹Р№)
 	local storedColor = categoryColors[player] and categoryColors[player][category]
 	if storedColor then
 		local parts = clone:GetDescendants()
@@ -166,7 +166,7 @@ local function equipSingleItem(player, item, category)
 	return true
 end
 
--- Надеть конкретную расу (заменяет текущую)
+-- РќР°РґРµС‚СЊ РєРѕРЅРєСЂРµС‚РЅСѓСЋ СЂР°СЃСѓ (Р·Р°РјРµРЅСЏРµС‚ С‚РµРєСѓС‰СѓСЋ)
 local function applyRace(player, raceName)
 	local char = player.Character
 	if not char then return end
@@ -176,21 +176,21 @@ local function applyRace(player, raceName)
 	local subFolder = raceFolder:FindFirstChild(raceName)
 	if not subFolder then return end
 
-	-- Удаляем всё, что было от старой расы
+	-- РЈРґР°Р»СЏРµРј РІСЃС‘, С‡С‚Рѕ Р±С‹Р»Рѕ РѕС‚ СЃС‚Р°СЂРѕР№ СЂР°СЃС‹
 	for _, child in ipairs(char:GetChildren()) do
 		if child:GetAttribute("RaceName") then
 			child:Destroy()
 		end
 	end
 
-	-- Клонируем новые объекты
+	-- РљР»РѕРЅРёСЂСѓРµРј РЅРѕРІС‹Рµ РѕР±СЉРµРєС‚С‹
 	for _, item in ipairs(subFolder:GetChildren()) do
 		local clone = item:Clone()
 		clone:SetAttribute("RaceName", raceName)
 		clone.Parent = char
 	end
 
-	-- Возвращаем расе последний выбранный цвет (иначе смена расы сбрасывает цвет)
+	-- Р’РѕР·РІСЂР°С‰Р°РµРј СЂР°СЃРµ РїРѕСЃР»РµРґРЅРёР№ РІС‹Р±СЂР°РЅРЅС‹Р№ С†РІРµС‚ (РёРЅР°С‡Рµ СЃРјРµРЅР° СЂР°СЃС‹ СЃР±СЂР°СЃС‹РІР°РµС‚ С†РІРµС‚)
 	local storedColor = categoryColors[player] and categoryColors[player]["Race"]
 	if storedColor then
 		for _, child in ipairs(char:GetChildren()) do
@@ -207,7 +207,7 @@ local function applyRace(player, raceName)
 	end
 end
 
--- Получить случайный предмет из папки
+-- РџРѕР»СѓС‡РёС‚СЊ СЃР»СѓС‡Р°Р№РЅС‹Р№ РїСЂРµРґРјРµС‚ РёР· РїР°РїРєРё
 local function getRandomItemFromFolder(folder)
 	local items = folder:GetChildren()
 	if #items == 0 then return nil end
@@ -216,15 +216,15 @@ local function getRandomItemFromFolder(folder)
 	return items[index]
 end
 
--- Применить случайный набор одежды согласно вероятностям
+-- РџСЂРёРјРµРЅРёС‚СЊ СЃР»СѓС‡Р°Р№РЅС‹Р№ РЅР°Р±РѕСЂ РѕРґРµР¶РґС‹ СЃРѕРіР»Р°СЃРЅРѕ РІРµСЂРѕСЏС‚РЅРѕСЃС‚СЏРј
 local function applyRandomOutfit(player)
-	print(">>> applyRandomOutfit вызван для", player.Name)
+	print(">>> applyRandomOutfit РІС‹Р·РІР°РЅ РґР»СЏ", player.Name)
 	local char = player.Character
-	if not char then warn("Нет персонажа"); return end
-	print("Персонаж присутствует:", char:GetFullName())
+	if not char then warn("РќРµС‚ РїРµСЂСЃРѕРЅР°Р¶Р°"); return end
+	print("РџРµСЂСЃРѕРЅР°Р¶ РїСЂРёСЃСѓС‚СЃС‚РІСѓРµС‚:", char:GetFullName())
 	local rng = Random.new()
 
-	-- Обязательные категории
+	-- РћР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РєР°С‚РµРіРѕСЂРёРё
 	for _, cat in ipairs({"Shirt","Pants","Eyes","Mouth"}) do
 		local folder = ServerStorage:FindFirstChild(cat)
 		if folder then
@@ -232,12 +232,12 @@ local function applyRandomOutfit(player)
 			if item then
 				equipSingleItem(player, item, cat)
 				equipEvent:FireClient(player, {category=cat, item=item.Name})
-				print("Надето:", cat, item.Name)
+				print("РќР°РґРµС‚Рѕ:", cat, item.Name)
 			end
 		end
 	end
 
-	-- Раса
+	-- Р Р°СЃР°
 	local raceFolder = ServerStorage:FindFirstChild("Race")
 	if raceFolder then
 		local subs = {}
@@ -248,11 +248,11 @@ local function applyRandomOutfit(player)
 			local chosen = subs[rng:NextInteger(1, #subs)]
 			applyRace(player, chosen.Name)
 			equipEvent:FireClient(player, {category="Race", item=chosen.Name})
-			print("Выдана раса:", chosen.Name)
+			print("Р’С‹РґР°РЅР° СЂР°СЃР°:", chosen.Name)
 		end
 	end
 
-	-- Опциональные категории
+	-- РћРїС†РёРѕРЅР°Р»СЊРЅС‹Рµ РєР°С‚РµРіРѕСЂРёРё
 	for _, opt in ipairs({
 		{name="Hair", chance=0.85},
 		{name="FacialHair", chance=0.20},
@@ -265,20 +265,20 @@ local function applyRandomOutfit(player)
 				if item then
 					equipSingleItem(player, item, opt.name)
 					equipEvent:FireClient(player, {category=opt.name, item=item.Name})
-					print("Опционально надето:", opt.name, item.Name)
+					print("РћРїС†РёРѕРЅР°Р»СЊРЅРѕ РЅР°РґРµС‚Рѕ:", opt.name, item.Name)
 				end
 			else
 				unequipCategory(player, opt.name)
 				equipEvent:FireClient(player, {category=opt.name, item=nil})
-				print("Категория", opt.name, "снята (не выпала)")
+				print("РљР°С‚РµРіРѕСЂРёСЏ", opt.name, "СЃРЅСЏС‚Р° (РЅРµ РІС‹РїР°Р»Р°)")
 			end
 		end
 	end
 
-	-- Цвета
+	-- Р¦РІРµС‚Р°
 	local skinCol = skinColors[rng:NextInteger(1, #skinColors)]
-	applyCategoryColor(player, "Skin", skinCol)   -- _G.PlayerSkinColors обновится внутри applyCategoryColor
-	print("Цвет кожи:", skinCol)
+	applyCategoryColor(player, "Skin", skinCol)   -- _G.PlayerSkinColors РѕР±РЅРѕРІРёС‚СЃСЏ РІРЅСѓС‚СЂРё applyCategoryColor
+	print("Р¦РІРµС‚ РєРѕР¶Рё:", skinCol)
 
 	local raceCol = getPleasantColor(rng, 0.05)
 	applyCategoryColor(player, "Race", raceCol)
@@ -288,13 +288,13 @@ local function applyRandomOutfit(player)
 			if equippedItems[player][cat] then
 				local col = getPleasantColor(rng, 0.07)
 				applyCategoryColor(player, cat, col)
-				print("Цвет", cat, ":", col)
+				print("Р¦РІРµС‚", cat, ":", col)
 			end
 		end
 	end
-	-- Перезапускаем idle после экипировки: спавн и одежда идут в один момент,
-	-- и трек, запущенный во время передачи владения персонажем клиенту, может
-	-- не отобразиться (тот же механизм, что в ReplaceAvatarWithRig)
+	-- РџРµСЂРµР·Р°РїСѓСЃРєР°РµРј idle РїРѕСЃР»Рµ СЌРєРёРїРёСЂРѕРІРєРё: СЃРїР°РІРЅ Рё РѕРґРµР¶РґР° РёРґСѓС‚ РІ РѕРґРёРЅ РјРѕРјРµРЅС‚,
+	-- Рё С‚СЂРµРє, Р·Р°РїСѓС‰РµРЅРЅС‹Р№ РІРѕ РІСЂРµРјСЏ РїРµСЂРµРґР°С‡Рё РІР»Р°РґРµРЅРёСЏ РїРµСЂСЃРѕРЅР°Р¶РµРј РєР»РёРµРЅС‚Сѓ, РјРѕР¶РµС‚
+	-- РЅРµ РѕС‚РѕР±СЂР°Р·РёС‚СЊСЃСЏ (С‚РѕС‚ Р¶Рµ РјРµС…Р°РЅРёР·Рј, С‡С‚Рѕ РІ ReplaceAvatarWithRig)
 	if _G.ReplayCharacterIdle then
 		task.delay(1, function()
 			if char.Parent then
@@ -303,10 +303,10 @@ local function applyRandomOutfit(player)
 		end)
 	end
 
-	print("<<< applyRandomOutfit завершена")
+	print("<<< applyRandomOutfit Р·Р°РІРµСЂС€РµРЅР°")
 end
 
--- Восстановить цвет кожи на персонаже (использует глобальную таблицу)
+-- Р’РѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ С†РІРµС‚ РєРѕР¶Рё РЅР° РїРµСЂСЃРѕРЅР°Р¶Рµ (РёСЃРїРѕР»СЊР·СѓРµС‚ РіР»РѕР±Р°Р»СЊРЅСѓСЋ С‚Р°Р±Р»РёС†Сѓ)
 local function applySkinColor(player)
 	local char = player.Character
 	if not char then return end
@@ -326,23 +326,23 @@ local function applySkinColor(player)
 	end
 end
 
--- ===================== ОБРАБОТЧИК ПОЯВЛЕНИЯ ПЕРСОНАЖА =====================
+-- ===================== РћР‘Р РђР‘РћРўР§РРљ РџРћРЇР’Р›Р•РќРРЇ РџР•Р РЎРћРќРђР–Рђ =====================
 --local spawnPosition = Vector3.new(10, 0, 0)
 --local spawnRotation = CFrame.Angles(0, math.rad(90), 0)
 
--- Внутри ServerInventory, функция onCharacterAdded
+-- Р’РЅСѓС‚СЂРё ServerInventory, С„СѓРЅРєС†РёСЏ onCharacterAdded
 local function onCharacterAdded(player, char)
-	print("Кастомный персонаж заспавнен:", player.Name)
+	print("РљР°СЃС‚РѕРјРЅС‹Р№ РїРµСЂСЃРѕРЅР°Р¶ Р·Р°СЃРїР°РІРЅРµРЅ:", player.Name)
 
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
 
-	-- Ждём полной инициализации
+	-- Р–РґС‘Рј РїРѕР»РЅРѕР№ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё
 	local head = char:WaitForChild("Head", 10)
-	if not head then warn("Head не найден"); return end
+	if not head then warn("Head РЅРµ РЅР°Р№РґРµРЅ"); return end
 	char:WaitForChild("HumanoidRootPart", 5)
 
-	-- Фиксируем позицию (на случай, если риг сместился)
+	-- Р¤РёРєСЃРёСЂСѓРµРј РїРѕР·РёС†РёСЋ (РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё СЂРёРі СЃРјРµСЃС‚РёР»СЃСЏ)
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if hrp then
 		hrp.Anchored = true
@@ -356,28 +356,28 @@ local function onCharacterAdded(player, char)
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
 	end
 	
-	-- Внутри onCharacterAdded, после установки позиции и до applyRandomOutfit
+	-- Р’РЅСѓС‚СЂРё onCharacterAdded, РїРѕСЃР»Рµ СѓСЃС‚Р°РЅРѕРІРєРё РїРѕР·РёС†РёРё Рё РґРѕ applyRandomOutfit
 	local genderValue = player:FindFirstChild("PlayerGender")
 	if not genderValue then
 		genderValue = Instance.new("StringValue")
 		genderValue.Name = "PlayerGender"
 		genderValue.Parent = player
-		-- Определяем пол по модели: если есть папка "Male" в Gender, и риг совпадает...
-		-- Но проще определить по названию рига, если оно содержит "_CustomAvatar" и мы знаем исходную папку.
-		-- Можно попробовать сравнить с maleRig, но это сложно. Оставим значение по умолчанию "male".
-		-- Лучше: если риг был клонирован из Gender.Male или Female, можно проверить исходную модель.
-		-- Поскольку у нас риг.Name = player.Name .. "_CustomAvatar", мы не знаем источник.
-		-- Поэтому просто установим "male" по умолчанию, а при смене пола обновится.
+		-- РћРїСЂРµРґРµР»СЏРµРј РїРѕР» РїРѕ РјРѕРґРµР»Рё: РµСЃР»Рё РµСЃС‚СЊ РїР°РїРєР° "Male" РІ Gender, Рё СЂРёРі СЃРѕРІРїР°РґР°РµС‚...
+		-- РќРѕ РїСЂРѕС‰Рµ РѕРїСЂРµРґРµР»РёС‚СЊ РїРѕ РЅР°Р·РІР°РЅРёСЋ СЂРёРіР°, РµСЃР»Рё РѕРЅРѕ СЃРѕРґРµСЂР¶РёС‚ "_CustomAvatar" Рё РјС‹ Р·РЅР°РµРј РёСЃС…РѕРґРЅСѓСЋ РїР°РїРєСѓ.
+		-- РњРѕР¶РЅРѕ РїРѕРїСЂРѕР±РѕРІР°С‚СЊ СЃСЂР°РІРЅРёС‚СЊ СЃ maleRig, РЅРѕ СЌС‚Рѕ СЃР»РѕР¶РЅРѕ. РћСЃС‚Р°РІРёРј Р·РЅР°С‡РµРЅРёРµ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ "male".
+		-- Р›СѓС‡С€Рµ: РµСЃР»Рё СЂРёРі Р±С‹Р» РєР»РѕРЅРёСЂРѕРІР°РЅ РёР· Gender.Male РёР»Рё Female, РјРѕР¶РЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ РёСЃС…РѕРґРЅСѓСЋ РјРѕРґРµР»СЊ.
+		-- РџРѕСЃРєРѕР»СЊРєСѓ Сѓ РЅР°СЃ СЂРёРі.Name = player.Name .. "_CustomAvatar", РјС‹ РЅРµ Р·РЅР°РµРј РёСЃС‚РѕС‡РЅРёРє.
+		-- РџРѕСЌС‚РѕРјСѓ РїСЂРѕСЃС‚Рѕ СѓСЃС‚Р°РЅРѕРІРёРј "male" РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ, Р° РїСЂРё СЃРјРµРЅРµ РїРѕР»Р° РѕР±РЅРѕРІРёС‚СЃСЏ.
 		genderValue.Value = "male"
-		print("PlayerGender не найден, установлен по умолчанию в 'male' для", player.Name)
+		print("PlayerGender РЅРµ РЅР°Р№РґРµРЅ, СѓСЃС‚Р°РЅРѕРІР»РµРЅ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РІ 'male' РґР»СЏ", player.Name)
 	end
 
-	-- Восстанавливаем цвет кожи и выдаём случайную одежду
+	-- Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµРј С†РІРµС‚ РєРѕР¶Рё Рё РІС‹РґР°С‘Рј СЃР»СѓС‡Р°Р№РЅСѓСЋ РѕРґРµР¶РґСѓ
 	pcall(applySkinColor, player)
 	pcall(applyRandomOutfit, player)
 end
 
--- ===================== ПОДКЛЮЧЕНИЕ СОБЫТИЙ =====================
+-- ===================== РџРћР”РљР›Р®Р§Р•РќРР• РЎРћР‘Р«РўРР™ =====================
 local function onPlayerAdded(player)
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
@@ -386,25 +386,25 @@ end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 
--- Игроки, зашедшие до запуска скрипта (например, в Studio Play Solo):
--- без отката их персонаж не получит одежду и PlayerGender
+-- РРіСЂРѕРєРё, Р·Р°С€РµРґС€РёРµ РґРѕ Р·Р°РїСѓСЃРєР° СЃРєСЂРёРїС‚Р° (РЅР°РїСЂРёРјРµСЂ, РІ Studio Play Solo):
+-- Р±РµР· РѕС‚РєР°С‚Р° РёС… РїРµСЂСЃРѕРЅР°Р¶ РЅРµ РїРѕР»СѓС‡РёС‚ РѕРґРµР¶РґСѓ Рё PlayerGender
 for _, player in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, player)
 end
 
 Players.PlayerRemoving:Connect(function(player)
-	-- очистка
+	-- РѕС‡РёСЃС‚РєР°
 	equippedItems[player] = nil
 	categoryColors[player] = nil
 	_G.PlayerSkinColors[player] = nil
 end)
 
--- ===================== ОБРАБОТЧИКИ REMOTE =====================
+-- ===================== РћР‘Р РђР‘РћРўР§РРљР REMOTE =====================
 
--- Получение списка предметов
+-- РџРѕР»СѓС‡РµРЅРёРµ СЃРїРёСЃРєР° РїСЂРµРґРјРµС‚РѕРІ
 getItemsFunction.OnServerInvoke = function(player, categoryName)
-	-- Валидация как у остальных ремоутов: не-строка роняет FindFirstChild
-	-- с ошибкой, а произвольное имя перечисляет содержимое ServerStorage
+	-- Р’Р°Р»РёРґР°С†РёСЏ РєР°Рє Сѓ РѕСЃС‚Р°Р»СЊРЅС‹С… СЂРµРјРѕСѓС‚РѕРІ: РЅРµ-СЃС‚СЂРѕРєР° СЂРѕРЅСЏРµС‚ FindFirstChild
+	-- СЃ РѕС€РёР±РєРѕР№, Р° РїСЂРѕРёР·РІРѕР»СЊРЅРѕРµ РёРјСЏ РїРµСЂРµС‡РёСЃР»СЏРµС‚ СЃРѕРґРµСЂР¶РёРјРѕРµ ServerStorage
 	if typeof(categoryName) ~= "string" or not VALID_EQUIP_CATEGORIES[categoryName] then
 		return {}
 	end
@@ -429,22 +429,22 @@ getItemsFunction.OnServerInvoke = function(player, categoryName)
 	end
 end
 
--- Экипировка / снятие
+-- Р­РєРёРїРёСЂРѕРІРєР° / СЃРЅСЏС‚РёРµ
 equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
-	-- Белый список категорий (иначе, например, FireServer("Gender","Male")
-	-- клонирует в персонажа целый риг из ServerStorage.Gender)
+	-- Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№ (РёРЅР°С‡Рµ, РЅР°РїСЂРёРјРµСЂ, FireServer("Gender","Male")
+	-- РєР»РѕРЅРёСЂСѓРµС‚ РІ РїРµСЂСЃРѕРЅР°Р¶Р° С†РµР»С‹Р№ СЂРёРі РёР· ServerStorage.Gender)
 	if typeof(categoryName) ~= "string" or not VALID_EQUIP_CATEGORIES[categoryName] then
-		warn("EquipItem: неизвестная категория " .. tostring(categoryName) .. " от " .. player.Name)
+		warn("EquipItem: РЅРµРёР·РІРµСЃС‚РЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ " .. tostring(categoryName) .. " РѕС‚ " .. player.Name)
 		return
 	end
 	if itemName ~= nil and typeof(itemName) ~= "string" then
-		warn("EquipItem: некорректное имя предмета от " .. player.Name)
+		warn("EquipItem: РЅРµРєРѕСЂСЂРµРєС‚РЅРѕРµ РёРјСЏ РїСЂРµРґРјРµС‚Р° РѕС‚ " .. player.Name)
 		return
 	end
 
-	print("Запрос от", player.Name, "категория:", categoryName, "предмет:", itemName)
+	print("Р—Р°РїСЂРѕСЃ РѕС‚", player.Name, "РєР°С‚РµРіРѕСЂРёСЏ:", categoryName, "РїСЂРµРґРјРµС‚:", itemName)
 
-	-- Защита от снятия обязательных категорий
+	-- Р—Р°С‰РёС‚Р° РѕС‚ СЃРЅСЏС‚РёСЏ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С… РєР°С‚РµРіРѕСЂРёР№
 	local nonRemovableCategories = {
 		Pants = true,
 		Shirt = true,
@@ -454,9 +454,9 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 	}
 
 	if not itemName then
-		print("Попытка СНЯТЬ категорию:", categoryName)
+		print("РџРѕРїС‹С‚РєР° РЎРќРЇРўР¬ РєР°С‚РµРіРѕСЂРёСЋ:", categoryName)
 		if nonRemovableCategories[categoryName] then
-			print("Нельзя снять (защита) –", categoryName)
+			print("РќРµР»СЊР·СЏ СЃРЅСЏС‚СЊ (Р·Р°С‰РёС‚Р°) вЂ“", categoryName)
 			return
 		end
 		unequipCategory(player, categoryName)
@@ -464,7 +464,7 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 		return
 	end
 
-	-- Смена расы
+	-- РЎРјРµРЅР° СЂР°СЃС‹
 	if categoryName == "Race" then
 		local char = player.Character
 		if not char then return end
@@ -488,53 +488,53 @@ equipEvent.OnServerEvent:Connect(function(player, categoryName, itemName)
 		return
 	end
 
-	-- Обычные предметы
+	-- РћР±С‹С‡РЅС‹Рµ РїСЂРµРґРјРµС‚С‹
 	local folder = ServerStorage:FindFirstChild(categoryName)
 	if not folder then return end
 	local item = folder:FindFirstChild(itemName)
 	if not item then return end
 
-	-- Если предмет уже надет — ничего не делаем (для обязательных) или снимаем (для опциональных)
+	-- Р•СЃР»Рё РїСЂРµРґРјРµС‚ СѓР¶Рµ РЅР°РґРµС‚ вЂ” РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµРј (РґР»СЏ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С…) РёР»Рё СЃРЅРёРјР°РµРј (РґР»СЏ РѕРїС†РёРѕРЅР°Р»СЊРЅС‹С…)
 	local currentList = equippedItems[player] and equippedItems[player][categoryName]
 	if currentList and #currentList > 0 and currentList[1].Name == itemName then
 		if not nonRemovableCategories[categoryName] then
 			unequipCategory(player, categoryName)
 			equipEvent:FireClient(player, { category = categoryName, item = nil })
 		else
-			print("Обязательная категория, снять нельзя.")
+			print("РћР±СЏР·Р°С‚РµР»СЊРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ, СЃРЅСЏС‚СЊ РЅРµР»СЊР·СЏ.")
 		end
 		return
 	end
 
-	-- Эхо только при реальной экипировке: если персонажа нет (окно респавна),
-	-- метка клиента не должна показывать предмет, которого на персонаже нет
+	-- Р­С…Рѕ С‚РѕР»СЊРєРѕ РїСЂРё СЂРµР°Р»СЊРЅРѕР№ СЌРєРёРїРёСЂРѕРІРєРµ: РµСЃР»Рё РїРµСЂСЃРѕРЅР°Р¶Р° РЅРµС‚ (РѕРєРЅРѕ СЂРµСЃРїР°РІРЅР°),
+	-- РјРµС‚РєР° РєР»РёРµРЅС‚Р° РЅРµ РґРѕР»Р¶РЅР° РїРѕРєР°Р·С‹РІР°С‚СЊ РїСЂРµРґРјРµС‚, РєРѕС‚РѕСЂРѕРіРѕ РЅР° РїРµСЂСЃРѕРЅР°Р¶Рµ РЅРµС‚
 	if equipSingleItem(player, item, categoryName) then
 		equipEvent:FireClient(player, { category = categoryName, item = itemName })
 	end
 end)
 
--- Изменение цвета
+-- РР·РјРµРЅРµРЅРёРµ С†РІРµС‚Р°
 changeColorEvent.OnServerEvent:Connect(function(player, category, color)
-	-- Валидация: без неё не-Color3 значение роняет обработчик (частичная перекраска, спам ошибок)
+	-- Р’Р°Р»РёРґР°С†РёСЏ: Р±РµР· РЅРµС‘ РЅРµ-Color3 Р·РЅР°С‡РµРЅРёРµ СЂРѕРЅСЏРµС‚ РѕР±СЂР°Р±РѕС‚С‡РёРє (С‡Р°СЃС‚РёС‡РЅР°СЏ РїРµСЂРµРєСЂР°СЃРєР°, СЃРїР°Рј РѕС€РёР±РѕРє)
 	if typeof(category) ~= "string" or (not VALID_EQUIP_CATEGORIES[category] and category ~= "Skin") then
-		warn("ChangePartColorEvent: неизвестная категория " .. tostring(category))
+		warn("ChangePartColorEvent: РЅРµРёР·РІРµСЃС‚РЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ " .. tostring(category))
 		return
 	end
 	if typeof(color) ~= "Color3" then
-		warn("ChangePartColorEvent: ожидался Color3, получено " .. typeof(color))
+		warn("ChangePartColorEvent: РѕР¶РёРґР°Р»СЃСЏ Color3, РїРѕР»СѓС‡РµРЅРѕ " .. typeof(color))
 		return
 	end
 	applyCategoryColor(player, category, color)
 end)
 
--- Получение цвета кожи игрока
+-- РџРѕР»СѓС‡РµРЅРёРµ С†РІРµС‚Р° РєРѕР¶Рё РёРіСЂРѕРєР°
 local getSkinColorFunction = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
 getSkinColorFunction.OnServerInvoke = function(player)
-	return _G.PlayerSkinColors[player]   -- вернёт nil, если ещё не установлен
+	return _G.PlayerSkinColors[player]   -- РІРµСЂРЅС‘С‚ nil, РµСЃР»Рё РµС‰С‘ РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ
 end
 
--- Снимок надетых предметов и выбранных цветов. Клиент запрашивает его при
--- инициализации: подтверждения экипировки со спавна он не получил (подключился позже)
+-- РЎРЅРёРјРѕРє РЅР°РґРµС‚С‹С… РїСЂРµРґРјРµС‚РѕРІ Рё РІС‹Р±СЂР°РЅРЅС‹С… С†РІРµС‚РѕРІ. РљР»РёРµРЅС‚ Р·Р°РїСЂР°С€РёРІР°РµС‚ РµРіРѕ РїСЂРё
+-- РёРЅРёС†РёР°Р»РёР·Р°С†РёРё: РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ СЌРєРёРїРёСЂРѕРІРєРё СЃРѕ СЃРїР°РІРЅР° РѕРЅ РЅРµ РїРѕР»СѓС‡РёР» (РїРѕРґРєР»СЋС‡РёР»СЃСЏ РїРѕР·Р¶Рµ)
 getEquippedFunction.OnServerInvoke = function(player)
 	local equipped = {}
 	local eq = equippedItems[player]
@@ -550,7 +550,7 @@ getEquippedFunction.OnServerInvoke = function(player)
 	for category, color in pairs(categoryColors[player] or {}) do
 		colors[category] = color
 	end
-	-- Кожа хранится в _G (могут писать и другие серверные скрипты) - она приоритетна
+	-- РљРѕР¶Р° С…СЂР°РЅРёС‚СЃСЏ РІ _G (РјРѕРіСѓС‚ РїРёСЃР°С‚СЊ Рё РґСЂСѓРіРёРµ СЃРµСЂРІРµСЂРЅС‹Рµ СЃРєСЂРёРїС‚С‹) - РѕРЅР° РїСЂРёРѕСЂРёС‚РµС‚РЅР°
 	if _G.PlayerSkinColors[player] then
 		colors.Skin = _G.PlayerSkinColors[player]
 	end

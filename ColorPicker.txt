@@ -6,8 +6,8 @@ local ColorPicker = {}
 ColorPicker.__index = ColorPicker
 
 -- new(pickerGui, initialColor, onColorChanged, onClosed)
--- onColorChanged вызывается с новым цветом (Color3) при любом изменении
--- onClosed вызывается без аргументов, когда пикер закрывается (accept или cancel)
+-- onColorChanged РІС‹Р·С‹РІР°РµС‚СЃСЏ СЃ РЅРѕРІС‹Рј С†РІРµС‚РѕРј (Color3) РїСЂРё Р»СЋР±РѕРј РёР·РјРµРЅРµРЅРёРё
+-- onClosed РІС‹Р·С‹РІР°РµС‚СЃСЏ Р±РµР· Р°СЂРіСѓРјРµРЅС‚РѕРІ, РєРѕРіРґР° РїРёРєРµСЂ Р·Р°РєСЂС‹РІР°РµС‚СЃСЏ (accept РёР»Рё cancel)
 function ColorPicker.new(pickerGui, initialColor, onColorChanged, onClosed)
 	local self = setmetatable({}, ColorPicker)
 	self._pickerGui = pickerGui
@@ -18,7 +18,7 @@ function ColorPicker.new(pickerGui, initialColor, onColorChanged, onClosed)
 	self._connections = {}
 	self._isDestroyed = false
 
-	-- Структура палитры
+	-- РЎС‚СЂСѓРєС‚СѓСЂР° РїР°Р»РёС‚СЂС‹
 	local cpframe = pickerGui:WaitForChild("color_picker_frame"):WaitForChild("color_picker"):WaitForChild("Frame")
 	self._hueBar = cpframe:WaitForChild("hue_bar")
 	self._satBar = cpframe:WaitForChild("saturation_bar")
@@ -85,14 +85,14 @@ function ColorPicker:_bindEvents()
 	local player = Players.LocalPlayer
 	local mouse = player:GetMouse()
 
-	-- Слайдеры
+	-- РЎР»Р°Р№РґРµСЂС‹
 	local function onSliderInput(slider, component)
 		local holding = false
 		local conn1 = slider.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				holding = true
-				-- Проверяем _isDestroyed: Destroy() отключает InputEnded,
-				-- и без этой проверки цикл крутился бы каждый кадр вечно
+				-- РџСЂРѕРІРµСЂСЏРµРј _isDestroyed: Destroy() РѕС‚РєР»СЋС‡Р°РµС‚ InputEnded,
+				-- Рё Р±РµР· СЌС‚РѕР№ РїСЂРѕРІРµСЂРєРё С†РёРєР» РєСЂСѓС‚РёР»СЃСЏ Р±С‹ РєР°Р¶РґС‹Р№ РєР°РґСЂ РІРµС‡РЅРѕ
 				while holding and not self._isDestroyed do
 					local relX = math.clamp(mouse.X - slider.AbsolutePosition.X, 0, slider.AbsoluteSize.X)
 					self["_"..component] = relX / slider.AbsoluteSize.X
@@ -114,7 +114,7 @@ function ColorPicker:_bindEvents()
 	onSliderInput(self._satBar, "s")
 	onSliderInput(self._valBar, "v")
 
-	-- Ввод HSV
+	-- Р’РІРѕРґ HSV
 	for component, input in pairs(self._hsvInputs) do
 		local conn = input.FocusLost:Connect(function()
 			local val = tonumber(input.Text)
@@ -123,13 +123,13 @@ function ColorPicker:_bindEvents()
 				self:UpdateUI()
 				self:_fireColorChanged()
 			else
-				self:UpdateUI() -- восстановить отображение
+				self:UpdateUI() -- РІРѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ РѕС‚РѕР±СЂР°Р¶РµРЅРёРµ
 			end
 		end)
 		table.insert(self._connections, conn)
 	end
 
-	-- Ввод RGB
+	-- Р’РІРѕРґ RGB
 	local function rgbChanged()
 		local r = tonumber(self._rgbInputs.r.Text)
 		local g = tonumber(self._rgbInputs.g.Text)
@@ -146,13 +146,13 @@ function ColorPicker:_bindEvents()
 		table.insert(self._connections, conn)
 	end
 
-	-- Кнопка Accept: просто закрываем
+	-- РљРЅРѕРїРєР° Accept: РїСЂРѕСЃС‚Рѕ Р·Р°РєСЂС‹РІР°РµРј
 	local connAccept = self._acceptBtn.Activated:Connect(function()
 		self:Destroy()
 	end)
 	table.insert(self._connections, connAccept)
 
-	-- Кнопка Cancel: возвращаем исходный цвет и закрываем
+	-- РљРЅРѕРїРєР° Cancel: РІРѕР·РІСЂР°С‰Р°РµРј РёСЃС…РѕРґРЅС‹Р№ С†РІРµС‚ Рё Р·Р°РєСЂС‹РІР°РµРј
 	local connCancel = self._cancelBtn.Activated:Connect(function()
 		if self._onColorChanged then
 			self._onColorChanged(self._initialColor)
@@ -174,7 +174,7 @@ function ColorPicker:Destroy()
 	if self._onClosed then
 		self._onClosed()
 	end
-	-- сам ScreenGui не удаляем, он скрывается извне
+	-- СЃР°Рј ScreenGui РЅРµ СѓРґР°Р»СЏРµРј, РѕРЅ СЃРєСЂС‹РІР°РµС‚СЃСЏ РёР·РІРЅРµ
 end
 
 return ColorPicker

@@ -1,14 +1,14 @@
 --[[
-	LocalScript внутри ElementMenuGui (HoverBorder2).
+	LocalScript РІРЅСѓС‚СЂРё ElementMenuGui (HoverBorder2).
 
-	ВАЖНО: это не устаревшая альтернатива HoverBorder, а НЕОБХОДИМЫЙ скрипт -
-	единственный, кто передаёт выбор стихии дальше: PlayButton -> ElementChosenEvent.
-	Без него финальный переход (SceneTransition) недостижим - не удалять.
+	Р’РђР–РќРћ: СЌС‚Рѕ РЅРµ СѓСЃС‚Р°СЂРµРІС€Р°СЏ Р°Р»СЊС‚РµСЂРЅР°С‚РёРІР° HoverBorder, Р° РќР•РћР‘РҐРћР”РРњР«Р™ СЃРєСЂРёРїС‚ -
+	РµРґРёРЅСЃС‚РІРµРЅРЅС‹Р№, РєС‚Рѕ РїРµСЂРµРґР°С‘С‚ РІС‹Р±РѕСЂ СЃС‚РёС…РёРё РґР°Р»СЊС€Рµ: PlayButton -> ElementChosenEvent.
+	Р‘РµР· РЅРµРіРѕ С„РёРЅР°Р»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґ (SceneTransition) РЅРµРґРѕСЃС‚РёР¶РёРј - РЅРµ СѓРґР°Р»СЏС‚СЊ.
 
-	Требует в ReplicatedStorage ДВА BindableEvent (не RemoteEvent!):
-	  - ElementChosenEvent       - выбор стихии отсюда в SceneTransition
-	  - ResetElementChoiceEvent  - сброс выбора из SceneTransition обратно сюда
-	У RemoteEvent нет ни .Event, ни :Fire(), код с RemoteEvent упал бы при старте.
+	РўСЂРµР±СѓРµС‚ РІ ReplicatedStorage Р”Р’Рђ BindableEvent (РЅРµ RemoteEvent!):
+	  - ElementChosenEvent       - РІС‹Р±РѕСЂ СЃС‚РёС…РёРё РѕС‚СЃСЋРґР° РІ SceneTransition
+	  - ResetElementChoiceEvent  - СЃР±СЂРѕСЃ РІС‹Р±РѕСЂР° РёР· SceneTransition РѕР±СЂР°С‚РЅРѕ СЃСЋРґР°
+	РЈ RemoteEvent РЅРµС‚ РЅРё .Event, РЅРё :Fire(), РєРѕРґ СЃ RemoteEvent СѓРїР°Р» Р±С‹ РїСЂРё СЃС‚Р°СЂС‚Рµ.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,15 +16,15 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local elementMenu = playerGui:WaitForChild("ElementMenuGui")
 
--- Модуль ElementMenu обслуживает инфо-фреймы тех же кнопок стихий.
--- Берём у него общий гейт кликов: если этот скрипт и модуль фильтруют клики
--- по отдельности, при спаме "Ваш выбор" и описание стихии разъезжаются
--- (видно описание одной стихии, а выбор - другой)
+-- РњРѕРґСѓР»СЊ ElementMenu РѕР±СЃР»СѓР¶РёРІР°РµС‚ РёРЅС„Рѕ-С„СЂРµР№РјС‹ С‚РµС… Р¶Рµ РєРЅРѕРїРѕРє СЃС‚РёС…РёР№.
+-- Р‘РµСЂС‘Рј Сѓ РЅРµРіРѕ РѕР±С‰РёР№ РіРµР№С‚ РєР»РёРєРѕРІ: РµСЃР»Рё СЌС‚РѕС‚ СЃРєСЂРёРїС‚ Рё РјРѕРґСѓР»СЊ С„РёР»СЊС‚СЂСѓСЋС‚ РєР»РёРєРё
+-- РїРѕ РѕС‚РґРµР»СЊРЅРѕСЃС‚Рё, РїСЂРё СЃРїР°РјРµ "Р’Р°С€ РІС‹Р±РѕСЂ" Рё РѕРїРёСЃР°РЅРёРµ СЃС‚РёС…РёРё СЂР°Р·СЉРµР·Р¶Р°СЋС‚СЃСЏ
+-- (РІРёРґРЅРѕ РѕРїРёСЃР°РЅРёРµ РѕРґРЅРѕР№ СЃС‚РёС…РёРё, Р° РІС‹Р±РѕСЂ - РґСЂСѓРіРѕР№)
 local ElementMenuModule = require(ReplicatedStorage:WaitForChild("ElementMenu"))
 
 if not ElementMenuModule.onElementToggled or not ElementMenuModule.isClickAllowed then
-	warn("HoverBorder2: модуль ElementMenu в ReplicatedStorage устарел (нет onElementToggled/isClickAllowed). "
-		.. "Замените его тело содержимым ElementMenu.txt - без этого выбор стихии и кнопка Play не работают!")
+	warn("HoverBorder2: РјРѕРґСѓР»СЊ ElementMenu РІ ReplicatedStorage СѓСЃС‚Р°СЂРµР» (РЅРµС‚ onElementToggled/isClickAllowed). "
+		.. "Р—Р°РјРµРЅРёС‚Рµ РµРіРѕ С‚РµР»Рѕ СЃРѕРґРµСЂР¶РёРјС‹Рј ElementMenu.txt - Р±РµР· СЌС‚РѕРіРѕ РІС‹Р±РѕСЂ СЃС‚РёС…РёРё Рё РєРЅРѕРїРєР° Play РЅРµ СЂР°Р±РѕС‚Р°СЋС‚!")
 end
 
 local function brightenColor(color: Color3, factor: number): Color3
@@ -33,7 +33,7 @@ local function brightenColor(color: Color3, factor: number): Color3
 	return Color3.fromHSV(h, s, v)
 end
 
--- Конфигурация стихий: имя кнопки > { отображаемое имя, цвет }
+-- РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ СЃС‚РёС…РёР№: РёРјСЏ РєРЅРѕРїРєРё > { РѕС‚РѕР±СЂР°Р¶Р°РµРјРѕРµ РёРјСЏ, С†РІРµС‚ }
 local ELEMENT_CONFIG = {
 	FireButton  = { Name = "Fire",  Color = Color3.fromRGB(236, 124, 27) },
 	WaterButton = { Name = "Water", Color = Color3.fromRGB(72, 165, 236) },
@@ -43,7 +43,7 @@ local ELEMENT_CONFIG = {
 	GloomButton = { Name = "Gloom", Color = Color3.fromRGB(157, 136, 117) },
 }
 
--- Ищем TextLabel, куда будем выводить название стихии
+-- РС‰РµРј TextLabel, РєСѓРґР° Р±СѓРґРµРј РІС‹РІРѕРґРёС‚СЊ РЅР°Р·РІР°РЅРёРµ СЃС‚РёС…РёРё
 local yourChoiceLabel = nil
 local yourChoiceFrame = elementMenu:FindFirstChild("YourChoiceFrame", true)
 
@@ -57,7 +57,7 @@ if yourChoiceFrame then
 	yourChoiceLabel = yourChoiceFrame:FindFirstChild("Element")
 end
 
--- ===== ЛОГИКА ПОДСВЕТКИ КНОПОК (без изменений в основной части) =====
+-- ===== Р›РћР“РРљРђ РџРћР”РЎР’Р•РўРљР РљРќРћРџРћРљ (Р±РµР· РёР·РјРµРЅРµРЅРёР№ РІ РѕСЃРЅРѕРІРЅРѕР№ С‡Р°СЃС‚Рё) =====
 local buttonHighlights = {}
 
 local function setupElementButton(button: GuiButton)
@@ -113,7 +113,7 @@ end
 
 local selectedButton: GuiButton? = nil
 
--- Обновление текстового поля при выборе/сбросе
+-- РћР±РЅРѕРІР»РµРЅРёРµ С‚РµРєСЃС‚РѕРІРѕРіРѕ РїРѕР»СЏ РїСЂРё РІС‹Р±РѕСЂРµ/СЃР±СЂРѕСЃРµ
 local function updateChoiceLabel(button: GuiButton?)
 	if not yourChoiceLabel then return end
 
@@ -141,12 +141,12 @@ local function updateChoiceLabel(button: GuiButton?)
 	end
 end
 
--- ===== ВЫБОР СТИХИЙ =====
--- Кнопки стихий подключает модуль ElementMenu (он же открывает инфо-фреймы).
--- Сюда приходит готовое решение: (кнопка, выбрана/снята) - и подсветка, и
--- "Ваш выбор", и описание стихии живут по одному решению. Раньше у этого
--- скрипта был собственный обработчик с отдельным фильтром кликов, и из-за
--- расхождения фильтров выбор мог теряться молча.
+-- ===== Р’Р«Р‘РћР  РЎРўРРҐРР™ =====
+-- РљРЅРѕРїРєРё СЃС‚РёС…РёР№ РїРѕРґРєР»СЋС‡Р°РµС‚ РјРѕРґСѓР»СЊ ElementMenu (РѕРЅ Р¶Рµ РѕС‚РєСЂС‹РІР°РµС‚ РёРЅС„Рѕ-С„СЂРµР№РјС‹).
+-- РЎСЋРґР° РїСЂРёС…РѕРґРёС‚ РіРѕС‚РѕРІРѕРµ СЂРµС€РµРЅРёРµ: (РєРЅРѕРїРєР°, РІС‹Р±СЂР°РЅР°/СЃРЅСЏС‚Р°) - Рё РїРѕРґСЃРІРµС‚РєР°, Рё
+-- "Р’Р°С€ РІС‹Р±РѕСЂ", Рё РѕРїРёСЃР°РЅРёРµ СЃС‚РёС…РёРё Р¶РёРІСѓС‚ РїРѕ РѕРґРЅРѕРјСѓ СЂРµС€РµРЅРёСЋ. Р Р°РЅСЊС€Рµ Сѓ СЌС‚РѕРіРѕ
+-- СЃРєСЂРёРїС‚Р° Р±С‹Р» СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє СЃ РѕС‚РґРµР»СЊРЅС‹Рј С„РёР»СЊС‚СЂРѕРј РєР»РёРєРѕРІ, Рё РёР·-Р·Р°
+-- СЂР°СЃС…РѕР¶РґРµРЅРёСЏ С„РёР»СЊС‚СЂРѕРІ РІС‹Р±РѕСЂ РјРѕРі С‚РµСЂСЏС‚СЊСЃСЏ РјРѕР»С‡Р°.
 if ElementMenuModule.onElementToggled then
 	ElementMenuModule.onElementToggled(function(button, isSelected)
 		if isSelected then
@@ -173,23 +173,23 @@ local function deselectAllButtons()
 		local highlight = buttonHighlights[selectedButton]
 		if highlight then
 			highlight.deselect()
-			-- GuiButton.Selected не влияет на Custom-кнопки, поэтому не трогаем
+			-- GuiButton.Selected РЅРµ РІР»РёСЏРµС‚ РЅР° Custom-РєРЅРѕРїРєРё, РїРѕСЌС‚РѕРјСѓ РЅРµ С‚СЂРѕРіР°РµРј
 		end
 		selectedButton = nil
 		updateChoiceLabel(nil)
 	end
 end
 
--- BindableEvent (клиент->клиент): у RemoteEvent нет .Event и :Fire()
--- (ReplicatedStorage объявлен в начале скрипта)
+-- BindableEvent (РєР»РёРµРЅС‚->РєР»РёРµРЅС‚): Сѓ RemoteEvent РЅРµС‚ .Event Рё :Fire()
+-- (ReplicatedStorage РѕР±СЉСЏРІР»РµРЅ РІ РЅР°С‡Р°Р»Рµ СЃРєСЂРёРїС‚Р°)
 local resetChoiceEvent = ReplicatedStorage:WaitForChild("ResetElementChoiceEvent")
 resetChoiceEvent.Event:Connect(deselectAllButtons)
 
--- ===== СКАНИРОВАНИЕ =====
+-- ===== РЎРљРђРќРР РћР’РђРќРР• =====
 if elementMenu then
 	local function scan(parent: Instance)
 		for _, child in ipairs(parent:GetChildren()) do
-			-- Только hover-подсветка: сами клики подключает ElementMenu
+			-- РўРѕР»СЊРєРѕ hover-РїРѕРґСЃРІРµС‚РєР°: СЃР°РјРё РєР»РёРєРё РїРѕРґРєР»СЋС‡Р°РµС‚ ElementMenu
 			if child:IsA("GuiButton") and ELEMENT_CONFIG[child.Name] then
 				setupElementButton(child)
 			end
@@ -198,45 +198,45 @@ if elementMenu then
 	end
 	scan(elementMenu)
 
-	-- Кнопка "Назад"
+	-- РљРЅРѕРїРєР° "РќР°Р·Р°Рґ"
 	local backButton = elementMenu:FindFirstChild("BackButton", true)
 	if backButton and backButton:IsA("GuiButton") then
 		backButton.Activated:Connect(deselectAllButtons)
 	else
-		warn("BackButton не найден")
+		warn("BackButton РЅРµ РЅР°Р№РґРµРЅ")
 	end
 
-	-- Инициализация состояния метки (скрыта, пока ничего не выбрано)
+	-- РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃРѕСЃС‚РѕСЏРЅРёСЏ РјРµС‚РєРё (СЃРєСЂС‹С‚Р°, РїРѕРєР° РЅРёС‡РµРіРѕ РЅРµ РІС‹Р±СЂР°РЅРѕ)
 	updateChoiceLabel(nil)
 
-	print("Hover-эффекты, выбор стихий и отображение названия работают.")
+	print("Hover-СЌС„С„РµРєС‚С‹, РІС‹Р±РѕСЂ СЃС‚РёС…РёР№ Рё РѕС‚РѕР±СЂР°Р¶РµРЅРёРµ РЅР°Р·РІР°РЅРёСЏ СЂР°Р±РѕС‚Р°СЋС‚.")
 else
-	warn("ElementMenuGui не найден")
+	warn("ElementMenuGui РЅРµ РЅР°Р№РґРµРЅ")
 end
 
 -- ===============================
--- Обработка нажатия PlayButton
+-- РћР±СЂР°Р±РѕС‚РєР° РЅР°Р¶Р°С‚РёСЏ PlayButton
 -- ===============================
--- BindableEvent (клиент->клиент): у RemoteEvent нет :Fire()
+-- BindableEvent (РєР»РёРµРЅС‚->РєР»РёРµРЅС‚): Сѓ RemoteEvent РЅРµС‚ :Fire()
 local chosenEvent = ReplicatedStorage:WaitForChild("ElementChosenEvent")
 
 if playButton then
 	playButton.Activated:Connect(function()
-		-- На время переходов и анимаций инфо-фреймов Play заблокирован
+		-- РќР° РІСЂРµРјСЏ РїРµСЂРµС…РѕРґРѕРІ Рё Р°РЅРёРјР°С†РёР№ РёРЅС„Рѕ-С„СЂРµР№РјРѕРІ Play Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ
 		if not ElementMenuModule.isClickAllowed() then return end
 		if selectedButton then
 			local config = ELEMENT_CONFIG[selectedButton.Name]
 			if config then
-				-- Отправляем имя стихии в первый скрипт
+				-- РћС‚РїСЂР°РІР»СЏРµРј РёРјСЏ СЃС‚РёС…РёРё РІ РїРµСЂРІС‹Р№ СЃРєСЂРёРїС‚
 				chosenEvent:Fire(config.Name)
 			else
-				warn("Не удалось определить конфигурацию для кнопки " .. selectedButton.Name)
+				warn("РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ РєРѕРЅС„РёРіСѓСЂР°С†РёСЋ РґР»СЏ РєРЅРѕРїРєРё " .. selectedButton.Name)
 			end
 		else
-			-- Ничего не выбрано – можно добавить звук или анимацию "ошибки", если нужно
-			print("Стихия не выбрана, переход заблокирован.")
+			-- РќРёС‡РµРіРѕ РЅРµ РІС‹Р±СЂР°РЅРѕ вЂ“ РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ Р·РІСѓРє РёР»Рё Р°РЅРёРјР°С†РёСЋ "РѕС€РёР±РєРё", РµСЃР»Рё РЅСѓР¶РЅРѕ
+			print("РЎС‚РёС…РёСЏ РЅРµ РІС‹Р±СЂР°РЅР°, РїРµСЂРµС…РѕРґ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ.")
 		end
 	end)
 else
-	warn("PlayButton не найден в ElementMenuGui.ButtonContainer")
+	warn("PlayButton РЅРµ РЅР°Р№РґРµРЅ РІ ElementMenuGui.ButtonContainer")
 end
