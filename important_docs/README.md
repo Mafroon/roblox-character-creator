@@ -6,7 +6,8 @@ setup details, and other useful information gathered while working on the script
 Conventions:
 
 - One topic per markdown file, with a descriptive name (e.g. `remote-events.md`, `studio-setup.md`).
-- Date each note and mention which script `.txt` files it applies to — the snippets evolve.
-- Keep files UTF-8: the Windows-1251 encoding rule applies only to the Luau `.txt` snippets.
+- Date each note and mention which script files it applies to — the snippets evolve.
+- Keep files UTF-8; Luau sources are UTF-8 too (since 2026-09-16, when they moved
+  from Windows-1251 `.txt` to the Rojo `src/` tree — see `studio-integration.md`).
 - Official Roblox docs are available offline in the local clone at `D:\creator-docs`
   (see AGENTS.md) — prefer linking/excerpting from there over guessing APIs from memory.
