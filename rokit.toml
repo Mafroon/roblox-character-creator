@@ -1,0 +1,3 @@
+# Toolchain pinned for this repo (install with: rokit install)
+[tools]
+rojo = "rojo-rbx/rojo@7.6.1"

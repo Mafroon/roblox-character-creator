@@ -1,6 +1,6 @@
-# Preserve files byte-for-byte: they are Windows-1251 encoded with CRLF
-# line endings. Do not let git normalize EOLs (would churn every line).
-*.txt -text
+# Preserve files byte-for-byte: Luau sources are UTF-8 with CRLF line
+# endings. Do not let git normalize EOLs (would churn every line).
+*.luau -text
 *.md text eol=lf
 .gitattributes text eol=lf
 .gitignore text eol=lf

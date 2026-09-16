@@ -1,0 +1,70 @@
+{
+  "name": "rb_scripts",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+
+      "ColorPicker": { "$path": "src/ReplicatedStorage/ColorPicker.luau" },
+      "SceneEffects": { "$path": "src/ReplicatedStorage/SceneEffects.luau" },
+      "InventoryController": { "$path": "src/ReplicatedStorage/InventoryController.luau" },
+      "ElementMenu": { "$path": "src/ReplicatedStorage/ElementMenu.luau" },
+
+      "RequestTeleport": { "$className": "RemoteEvent" },
+      "ChangeGenderEvent": { "$className": "RemoteEvent" },
+      "ChangePartColorEvent": { "$className": "RemoteEvent" },
+      "EquipItem": { "$className": "RemoteEvent" },
+
+      "GetInventoryItems": { "$className": "RemoteFunction" },
+      "GetPlayerSkinColor": { "$className": "RemoteFunction" },
+      "GetEquippedItems": { "$className": "RemoteFunction" },
+
+      "StartGameEvent": { "$className": "BindableEvent" },
+      "ElementChosenEvent": { "$className": "BindableEvent" },
+      "ResetElementChoiceEvent": { "$className": "BindableEvent" }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+
+      "InventoryServer": { "$path": "src/ServerScriptService/InventoryServer.server.luau" },
+      "Teleport": { "$path": "src/ServerScriptService/Teleport.server.luau" },
+      "MaleFemale": { "$path": "src/ServerScriptService/MaleFemale.server.luau" },
+      "ReplaceAvatarWithRig": { "$path": "src/ServerScriptService/ReplaceAvatarWithRig.server.luau" }
+    },
+
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$ignoreUnknownInstances": true,
+
+      "LoadingScript": { "$path": "src/ReplicatedFirst/LoadingScript.client.luau" }
+    },
+
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$ignoreUnknownInstances": true,
+
+      "MainMenuGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "SceneTransition": { "$path": "src/StarterGui/MainMenuGui/SceneTransition.client.luau" },
+        "HoverBorder": { "$path": "src/StarterGui/MainMenuGui/HoverBorder.client.luau" }
+      },
+
+      "ElementMenuGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "HoverBorder2": { "$path": "src/StarterGui/ElementMenuGui/HoverBorder2.client.luau" }
+      },
+
+      "CreationMenuGui": {
+        "$className": "ScreenGui",
+        "$ignoreUnknownInstances": true,
+        "RotateScript": { "$path": "src/StarterGui/CreationMenuGui/RotateScript.client.luau" }
+      }
+    }
+  }
+}
