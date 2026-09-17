@@ -355,7 +355,7 @@ local function onCharacterAdded(player, char)
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
 	end
-	
+
 	-- Внутри onCharacterAdded, после установки позиции и до applyRandomOutfit
 	local genderValue = player:FindFirstChild("PlayerGender")
 	if not genderValue then

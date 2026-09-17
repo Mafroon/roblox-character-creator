@@ -76,9 +76,9 @@ local elementBackButton = elementButtonContainer:WaitForChild("BackButton")
 -- ===================== СОСТОЯНИЕ =====================
 local isTransitioning = false
 local originalMainPos = mainContainer.Position
--- База камеры должна совпадать со стартовой позицией из CameraLockScript (0, 8, 0),
+-- База камеры должна совпадать со стартовой позицией из CameraLockScript (0, 4, 0),
 -- иначе первый переход даёт рывок камеры по высоте
-local cameraBasePos = Vector3.new(0, 8, 0)
+local cameraBasePos = Vector3.new(0, 4, 0)
 
 -- ===================== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ =====================
 ElementMenu.init({

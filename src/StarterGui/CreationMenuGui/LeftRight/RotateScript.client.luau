@@ -39,10 +39,10 @@
 
         local angle = math.rad(ROTATION_SPEED) * dt
         if rotatingLeft then
-            -- Left -> поворот вправо (по часовой) > отрицательный угол
+            -- Left -> поворот вправо (по часовой) → отрицательный угол
             currentRotation = currentRotation - angle
         elseif rotatingRight then
-            -- Right -> поворот влево > положительный угол
+            -- Right -> поворот влево → положительный угол
             currentRotation = currentRotation + angle
         end
 

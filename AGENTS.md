@@ -16,11 +16,11 @@ Roblox **Luau** scripts for a character-creation game (gender/race/skin customiz
 | `src/ServerScriptService/ReplaceAvatarWithRig.server.luau` | Script in `ServerScriptService` (custom spawn, `CharacterAutoLoads = false`) |
 | `src/ReplicatedFirst/LoadingScript.client.luau` | LocalScript `LoadingScript` in `ReplicatedFirst` |
 | `src/StarterGui/MainMenuGui/SceneTransition.client.luau` | LocalScript in `StarterGui/MainMenuGui` — orchestrator; requires the 3 modules above |
-| `src/StarterGui/MainMenuGui/HoverBorder.client.luau` | LocalScript in `MainMenuGui` (instance name in Studio may be `UniversalBorderEffect` — verify before renaming) |
+| `src/StarterGui/HoverBorder.client.luau` | LocalScript `HoverBorder` at **`StarterGui` root** (clones to `PlayerGui` root at runtime; verified 2026-09-17 — not inside `MainMenuGui`) |
 | `src/StarterGui/ElementMenuGui/HoverBorder2.client.luau` | LocalScript in `ElementMenuGui`; **load-bearing** — the only script wiring `PlayButton` → `ElementChosenEvent` (final transition); do not prune |
-| `src/StarterGui/CreationMenuGui/RotateScript.client.luau` | LocalScript in CreationMenuGui |
-| `snippets/CameraLockScript.luau` | camera setup snippet (menu scene) — placement not yet confirmed |
-| `snippets/HoverEffect*.luau` | button hover snippets (inside menu GUIs) — placement not yet confirmed |
+| `src/StarterGui/CreationMenuGui/LeftRight/RotateScript.client.luau` | LocalScript `RotateScript` inside `CreationMenuGui/LeftRight` (verified 2026-09-17) |
+| `snippets/CameraLockScript.luau` | camera setup snippet — real instance is `StarterGui.MainMenuGui.CameraLockScript`; **Studio copy has diverged from the snippet** (menu camera Y 8 → 4) and is NOT under Rojo — don't restore the snippet over it |
+| `snippets/HoverEffect*.luau` | button hover drafts — the live scripts are `HoverEffect` LocalScripts inside `MainMenuGui/MainContainer/Slot1–3` (a 4th iteration, differing from all snippet variants); not under Rojo |
 
 ## Tooling & workflow
 
@@ -43,7 +43,7 @@ Scripts communicate through instances expected in the DataModel — renaming in 
 - **Module requires**: `SceneTransition` requires the ModuleScripts `SceneEffects`, `InventoryController`, `ElementMenu` from `ReplicatedStorage` by exact name (via `WaitForChild`). Module init signatures are documented in each file's header comment.
 
 - **ReplicatedStorage**: RemoteEvents `RequestTeleport`, `ChangeGenderEvent`, `ChangePartColorEvent`, `EquipItem`; RemoteFunctions `GetInventoryItems`, `GetPlayerSkinColor`, `GetEquippedItems` (snapshot of worn items + chosen category colors, invoked by `InventoryController.init` at startup); BindableEvents `StartGameEvent` (client-only: fired by LoadingScript, awaited by SceneTransition), `ElementChosenEvent` and `ResetElementChoiceEvent` (client→client signals between `HoverBorder2` and `SceneTransition` — the code uses `.Event`/`:Fire()`, so the instances MUST be BindableEvents, not RemoteEvents, or both scripts error at startup); ModuleScript `ColorPicker`.
-- **PlayerGui ScreenGuis**: `MainMenuGui`, `ElementMenuGui`, `CreationMenuGui`, `LoadingScreen`, `EntranceGui` (plus many named child frames/buttons).
+- **ScreenGuis**: `MainMenuGui`, `ElementMenuGui`, `CreationMenuGui`, `EntranceGui` live in `StarterGui` (reach scripts as `PlayerGui` clones); **`LoadingScreen` lives in `ReplicatedFirst`** — `LoadingScript` does `ReplicatedFirst:WaitForChild("LoadingScreen")` on it (plus many named child frames/buttons).
 - **ServerStorage.Gender**: rig models `Male` and `Female`.
 - **`_G.PlayerSkinColors`**: server-side skin-color sync between server scripts (InventoryServer and others) — intentional `_G` usage, not a leftover.
 

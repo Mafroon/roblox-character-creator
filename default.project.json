@@ -47,11 +47,12 @@
       "$className": "StarterGui",
       "$ignoreUnknownInstances": true,
 
+      "HoverBorder": { "$path": "src/StarterGui/HoverBorder.client.luau" },
+
       "MainMenuGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
-        "SceneTransition": { "$path": "src/StarterGui/MainMenuGui/SceneTransition.client.luau" },
-        "HoverBorder": { "$path": "src/StarterGui/MainMenuGui/HoverBorder.client.luau" }
+        "SceneTransition": { "$path": "src/StarterGui/MainMenuGui/SceneTransition.client.luau" }
       },
 
       "ElementMenuGui": {
@@ -63,7 +64,11 @@
       "CreationMenuGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
-        "RotateScript": { "$path": "src/StarterGui/CreationMenuGui/RotateScript.client.luau" }
+        "LeftRight": {
+          "$className": "Frame",
+          "$ignoreUnknownInstances": true,
+          "RotateScript": { "$path": "src/StarterGui/CreationMenuGui/LeftRight/RotateScript.client.luau" }
+        }
       }
     }
   }

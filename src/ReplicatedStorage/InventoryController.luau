@@ -300,7 +300,7 @@ function InventoryController.init(deps)
 		Inventory1Pants, Inventory1Shirt, Inventory1Extra, Inventory1Mouth,
 		Inventory2Eyes, Inventory2FacialHair, Inventory2Hair, Inventory2Race,
 		ColorSkin, ColorEyes, ColorFacialHair, ColorHair, ColorRace,
-	}) do
+		}) do
 		allFrames[frame] = true
 		frame.Visible = false
 	end
