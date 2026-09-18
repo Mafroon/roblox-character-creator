@@ -1,11 +1,16 @@
 --[[
 	ElementMenu - клиентский модуль инфо-фреймов стихий.
-	ModuleScript: поместить в ReplicatedStorage с именем "ElementMenu".
-	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+	ModuleScript в ReplicatedStorage с именем "ElementMenu".
+	Используется локальным скриптом SceneTransition
+	(src/StarterGui/MainMenuGui/SceneTransition.client.luau).
 
 	Отвечает за информационные фреймы стихий (Fire, Water, Earth, Air,
 	Light, Gloom) в ElementMenuGui: показ/скрытие по клику на кнопку
 	стихии и принудительное закрытие при переходах.
+
+	ElementMenu.ELEMENTS - единственная таблица конфигурации стихий
+	(имена кнопок/фреймов, отображаемые имена, цвета); HoverBorder2
+	строит по ней свой поиск.
 
 	Единственный обработчик кликов по кнопкам стихий: HoverBorder2 больше
 	не подключает эти кнопки сам, а подписывается на готовое решение через
@@ -21,15 +26,28 @@ local ElementMenu = {}
 local INFO_HIDE_POS = UDim2.new(1.1, 0, 0.4, 0)
 local INFO_SHOW_POS = UDim2.new(0.6, 0, 0.4, 0)
 
--- Список стихий: имена фрейма в InfoFrame и кнопки в ElementMenuGui
-local ELEMENTS = {
-	{ infoFrame = "FireInfoFrame",  button = "FireButton" },
-	{ infoFrame = "WaterInfoFrame", button = "WaterButton" },
-	{ infoFrame = "EarthInfoFrame", button = "EarthButton" },
-	{ infoFrame = "AirInfoFrame",   button = "AirButton" },
-	{ infoFrame = "LightInfoFrame", button = "LightButton" },
-	{ infoFrame = "GloomInfoFrame", button = "GloomButton" },
+-- Конфигурация стихий: имя кнопки в ElementMenuGui, её инфо-фрейм в
+-- InfoFrame, отображаемое имя и фирменный цвет. Тот же список использует
+-- HoverBorder2 ("Ваш выбор" и подсветка); whitelist Teleport.VALID_ELEMENTS
+-- держите с ним в синхроне вручную
+export type ElementConfig = {
+	button: string,
+	infoFrame: string,
+	name: string,
+	color: Color3,
 }
+
+local ELEMENTS: {ElementConfig} = {
+	{ button = "FireButton",  infoFrame = "FireInfoFrame",  name = "Fire",  color = Color3.fromRGB(236, 124, 27) },
+	{ button = "WaterButton", infoFrame = "WaterInfoFrame", name = "Water", color = Color3.fromRGB(72, 165, 236) },
+	{ button = "EarthButton", infoFrame = "EarthInfoFrame", name = "Earth", color = Color3.fromRGB(110, 191, 66) },
+	{ button = "AirButton",   infoFrame = "AirInfoFrame",   name = "Air",   color = Color3.fromRGB(164, 188, 195) },
+	{ button = "LightButton", infoFrame = "LightInfoFrame", name = "Light", color = Color3.fromRGB(213, 169, 109) },
+	{ button = "GloomButton", infoFrame = "GloomInfoFrame", name = "Gloom", color = Color3.fromRGB(157, 136, 117) },
+}
+
+-- Единственный источник списка стихий для остальных скриптов
+ElementMenu.ELEMENTS = ELEMENTS
 
 local currentInfoFrame = nil    -- какой фрейм открыт сейчас
 local isInfoAnimating = false
@@ -170,26 +188,15 @@ function ElementMenu.init(deps)
 
 	local infoFrameContainer = elementMenu:WaitForChild("InfoFrame")
 
-	-- Рекурсивный поиск кнопки по имени внутри elementMenu
-	local function findButton(parent, name)
-		for _, child in ipairs(parent:GetChildren()) do
-			if child.Name == name and child:IsA("GuiButton") then
-				return child
-			end
-			local found = findButton(child, name)
-			if found then return found end
-		end
-		return nil
-	end
-
 	-- Скрываем все инфо-фреймы и подключаем кнопки стихий
 	for _, element in ipairs(ELEMENTS) do
 		local infoFrame = infoFrameContainer:WaitForChild(element.infoFrame)
 		infoFrame.Visible = false
 		infoFrame.Position = INFO_HIDE_POS
 
-		local button = findButton(elementMenu, element.button)
-		if not button then
+		-- Поиск кнопки рекурсивно на уровне движка (быстрее обхода на Luau)
+		local button = elementMenu:FindFirstChild(element.button, true)
+		if not (button and button:IsA("GuiButton")) then
 			warn("Кнопка " .. element.button .. " не найдена в ElementMenuGui!")
 		else
 			-- Единственная точка клика по кнопке стихии; Activated работает

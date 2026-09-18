@@ -1,7 +1,8 @@
 --[[
 	SceneEffects - клиентский модуль эффектов переходов.
-	ModuleScript: поместить в ReplicatedStorage с именем "SceneEffects".
-	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+	ModuleScript в ReplicatedStorage с именем "SceneEffects".
+	Используется локальным скриптом SceneTransition
+	(src/StarterGui/MainMenuGui/SceneTransition.client.luau).
 
 	Общие анимации: поворот камеры, показ/скрытие редактора персонажа,
 	меню стихий и YourChoiceFrame. Функции твинов возвращают последний

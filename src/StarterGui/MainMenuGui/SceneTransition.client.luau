@@ -6,11 +6,10 @@
 	модули, подключает кнопки и управляет переходами между экранами
 	(меню - редактор - стихии - финальный полёт).
 
-	Требует три ModuleScript в ReplicatedStorage (создайте их и вставьте
-	содержимое соответствующих .txt файлов, имена должны совпадать):
-	  - SceneEffects          (SceneEffects.txt)         - анимации переходов
-	  - InventoryController   (InventoryController.txt)  - инвентари и цвета
-	  - ElementMenu           (ElementMenu.txt)          - инфо-фреймы стихий
+	Требует три ModuleScript в ReplicatedStorage (имена должны совпадать):
+	  - SceneEffects          - анимации переходов и камера
+	  - InventoryController   - инвентари и цвета
+	  - ElementMenu           - инфо-фреймы стихий
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -75,10 +74,10 @@ local elementBackButton = elementButtonContainer:WaitForChild("BackButton")
 
 -- ===================== СОСТОЯНИЕ =====================
 local isTransitioning = false
-local originalMainPos = mainContainer.Position
+local originalMainPos: UDim2 = mainContainer.Position
 -- База камеры должна совпадать со стартовой позицией из CameraLockScript (0, 4, 0),
 -- иначе первый переход даёт рывок камеры по высоте
-local cameraBasePos = Vector3.new(0, 4, 0)
+local cameraBasePos: Vector3 = Vector3.new(0, 4, 0)
 
 -- ===================== ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ =====================
 ElementMenu.init({
@@ -130,7 +129,7 @@ local FEMALE_INACTIVE_COLOR = Color3.fromRGB(194, 124, 206)
 local maleButton = genderFrame:WaitForChild("Frame"):WaitForChild("MaleButton")
 local femaleButton = genderFrame:WaitForChild("Frame"):WaitForChild("FemaleButton")
 
-local function updateGenderButtons(selectedGender)
+local function updateGenderButtons(selectedGender: string)
 	if selectedGender == "male" then
 		maleButton.BackgroundColor3 = ACTIVE_COLOR
 		femaleButton.BackgroundColor3 = FEMALE_INACTIVE_COLOR
@@ -153,7 +152,7 @@ else
 end
 
 -- Запрос смены пола на сервер
-local function applyGender(gender)
+local function applyGender(gender: string)
 	if gender == "male" or gender == "female" then
 		changeGenderEvent:FireServer(gender)
 		-- Мгновенно подсвечиваем кнопку для отзывчивости интерфейса
@@ -170,7 +169,7 @@ femaleButton.Activated:Connect(function() applyGender("female") end)
 
 -- ===================== СБОЙ ТЕЛЕПОРТАЦИИ =====================
 -- Финальный переход прячет все меню ещё до запроса телепортации. Если
--- TeleportAsync падает (сервер в Teleport.txt только предупреждает), игрок
+-- TeleportAsync падает (сервер в Teleport.server.luau только предупреждает), игрок
 -- остаётся в этом плейсе без интерфейса. TeleportInitFailed приходит и на
 -- клиент — восстанавливаем меню стихий, фон и камеру.
 -- restoreAfterTeleportFailure назначается в transitionToFinal.

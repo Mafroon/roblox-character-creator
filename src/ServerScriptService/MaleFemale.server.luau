@@ -1,7 +1,20 @@
+--[[
+	Смена пола персонажа (Script в ServerScriptService).
+
+	По ChangeGenderEvent заменяет торсы рига (ReplaceBodyPartR15) из
+	ServerStorage.Gender, сохраняет цвет кожи, обновляет StringValue
+	PlayerGender и перезапускает idle (AnimationController).
+
+	Требует в ReplicatedStorage RemoteEvent "ChangeGenderEvent".
+]]
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
+
+local AnimationController = require(script.Parent:WaitForChild("AnimationController"))
+local RigParts = require(script.Parent:WaitForChild("RigParts"))
 
 local changeGenderEvent = ReplicatedStorage:WaitForChild("ChangeGenderEvent")
 
@@ -73,15 +86,10 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 	end
 	genderValue.Value = gender
 
-	-- 4. Восстанавливаем цвет кожи (применяем ко всем частям тела)
+	-- 4. Восстанавливаем цвет кожи (применяем к частям тела из RigParts)
 	if skinColor then
 		RunService.Heartbeat:Wait()  -- ждём ровно 1 кадр, минимум задержки
-		local bodyParts = {
-			"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm",
-			"RightUpperArm", "RightLowerArm", "LeftUpperLeg", "LeftLowerLeg",
-			"RightUpperLeg", "RightLowerLeg"
-		}
-		for _, partName in ipairs(bodyParts) do
+		for _, partName in ipairs(RigParts.SKIN_PART_NAMES) do
 			local part = character:FindFirstChild(partName)
 			if part and part:IsA("BasePart") then
 				part.Color = skinColor
@@ -95,11 +103,7 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 	-- 5. Замена торсов через ReplaceBodyPartR15 пересобирает Motor6D и может
 	-- остановить игравший idle-трек - перезапускаем его, иначе персонаж
 	-- застывает "стойкой смирно" после смены пола
-	if _G.ReplayCharacterIdle then
-		_G.ReplayCharacterIdle(character)
-	else
-		warn("MaleFemale: _G.ReplayCharacterIdle недоступен - обновите скрипт ReplaceAvatarWithRig из ReplaceAvatarWithRig.txt")
-	end
+	AnimationController.replayCharacterIdle(character)
 
 	print("Пол игрока " .. player.Name .. " изменён на " .. gender)
 end)

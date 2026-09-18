@@ -24,7 +24,7 @@ local ElementMenuModule = require(ReplicatedStorage:WaitForChild("ElementMenu"))
 
 if not ElementMenuModule.onElementToggled or not ElementMenuModule.isClickAllowed then
 	warn("HoverBorder2: модуль ElementMenu в ReplicatedStorage устарел (нет onElementToggled/isClickAllowed). "
-		.. "Замените его тело содержимым ElementMenu.txt - без этого выбор стихии и кнопка Play не работают!")
+		.. "Замените его содержимым src/ReplicatedStorage/ElementMenu.luau - без этого выбор стихии и кнопка Play не работают!")
 end
 
 local function brightenColor(color: Color3, factor: number): Color3
@@ -33,15 +33,13 @@ local function brightenColor(color: Color3, factor: number): Color3
 	return Color3.fromHSV(h, s, v)
 end
 
--- Конфигурация стихий: имя кнопки > { отображаемое имя, цвет }
-local ELEMENT_CONFIG = {
-	FireButton  = { Name = "Fire",  Color = Color3.fromRGB(236, 124, 27) },
-	WaterButton = { Name = "Water", Color = Color3.fromRGB(72, 165, 236) },
-	EarthButton = { Name = "Earth", Color = Color3.fromRGB(110, 191, 66) },
-	AirButton   = { Name = "Air",   Color = Color3.fromRGB(164, 188, 195) },
-	LightButton = { Name = "Light", Color = Color3.fromRGB(213, 169, 109) },
-	GloomButton = { Name = "Gloom", Color = Color3.fromRGB(157, 136, 117) },
-}
+-- Конфигурация стихий берётся из модуля ElementMenu (ElementMenu.ELEMENTS):
+-- единственный источник имён и цветов - раньше копия таблицы здесь могла
+-- разъехаться с меню
+local ELEMENT_CONFIG: {[string]: ElementMenuModule.ElementConfig} = {}
+for _, element in ipairs(ElementMenuModule.ELEMENTS) do
+	ELEMENT_CONFIG[element.button] = element
+end
 
 -- Ищем TextLabel, куда будем выводить название стихии
 local yourChoiceLabel = nil
@@ -120,8 +118,8 @@ local function updateChoiceLabel(button: GuiButton?)
 	if button then
 		local config = ELEMENT_CONFIG[button.Name]
 		if config then
-			yourChoiceLabel.Text = config.Name
-			yourChoiceLabel.TextColor3 = config.Color
+			yourChoiceLabel.Text = config.name
+			yourChoiceLabel.TextColor3 = config.color
 			yourChoiceLabel.Visible = true
 			if playButton then
 				playButton.BackgroundTransparency = 0.3
@@ -228,7 +226,7 @@ if playButton then
 			local config = ELEMENT_CONFIG[selectedButton.Name]
 			if config then
 				-- Отправляем имя стихии в первый скрипт
-				chosenEvent:Fire(config.Name)
+				chosenEvent:Fire(config.name)
 			else
 				warn("Не удалось определить конфигурацию для кнопки " .. selectedButton.Name)
 			end

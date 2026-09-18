@@ -1,20 +1,28 @@
 --[[
-    ServerInventory – Полная версия с исправлениями.
-    Использует _G для синхронизации цвета кожи, ожидает Head вместо задержек.
-    Поместить в ServerScriptService.
+	ServerInventory - экипировка, расы и цвета персонажа.
+	Script в ServerScriptService.
 
-    Требует в ReplicatedStorage RemoteFunction "GetEquippedItems" - снимок
-    надетых предметов и цветов категорий для клиента (InventoryController.init).
+	Серверная часть кастомизации: случайный набор одежды на спавне,
+	экипировка/снятие предметов и рас, перекраска категорий и кожи.
+	Цвет кожи хранится в PlayerDataManager, перезапуск idle - в
+	AnimationController (раньше оба шли через _G).
+
+	Требует в ReplicatedStorage RemoteFunction "GetEquippedItems" - снимок
+	надетых предметов и цветов категорий для клиента (InventoryController.init).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
+local AnimationController = require(script.Parent:WaitForChild("AnimationController"))
+local PlayerDataManager = require(script.Parent:WaitForChild("PlayerDataManager"))
+local RigParts = require(script.Parent:WaitForChild("RigParts"))
+local ColorPalettes = require(ReplicatedStorage:WaitForChild("ColorPalettes"))
+
 -- ===================== ХРАНИЛИЩА =====================
 local equippedItems = {}           -- [player] = { [category] = {item, ...} }
 local categoryColors = {}          -- [player] = { [category] = Color3 } - выбранные цвета категорий
-_G.PlayerSkinColors = _G.PlayerSkinColors or {}   -- Глобальная таблица для синхронизации
 
 -- ===================== REMOTE ОБЪЕКТЫ =====================
 -- StartGameEvent здесь НЕ подключаем: это BindableEvent, он не пересекает
@@ -33,33 +41,16 @@ local VALID_EQUIP_CATEGORIES = {
 }
 
 -- ===================== ЦВЕТОВЫЕ ПАЛИТРЫ =====================
-local pleasantColors = {
-	Color3.fromRGB(255, 179, 186), Color3.fromRGB(255, 223, 186),
-	Color3.fromRGB(255, 255, 186), Color3.fromRGB(186, 255, 201),
-	Color3.fromRGB(186, 225, 255), Color3.fromRGB(210, 186, 255),
-	Color3.fromRGB(222, 184, 135), Color3.fromRGB(160, 120, 90),
-	Color3.fromRGB(150, 130, 110), Color3.fromRGB(100, 120, 150),
-	Color3.fromRGB(70, 90, 70),    Color3.fromRGB(150, 150, 150),
-	Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0),
-	Color3.fromRGB(50, 50, 50),
-}
-local accentColors = {
-	Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
-	Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
-	Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-}
-local skinColors = {
-	Color3.fromRGB(255, 205, 148), Color3.fromRGB(234, 192, 134),
-	Color3.fromRGB(210, 170, 120), Color3.fromRGB(181, 136, 99),
-	Color3.fromRGB(141, 101, 72),  Color3.fromRGB(102, 71, 45),
-	Color3.fromRGB(77, 53, 33),
-}
+-- Палитры общие с клиентом (рандомайзер) - см. ReplicatedStorage.ColorPalettes
+local skinColors = ColorPalettes.skinColors
 
-local function getPleasantColor(rng, accentChance)
-	if rng:NextNumber() < (accentChance or 0.07) then
-		return accentColors[rng:NextInteger(1, #accentColors)]
-	else
-		return pleasantColors[rng:NextInteger(1, #pleasantColors)]
+-- Перекрасить части тела под цвет кожи (только R15-имена - см. RigParts)
+local function paintSkinParts(char, color)
+	for _, partName in ipairs(RigParts.SKIN_PART_NAMES) do
+		local part = char:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			part.Color = color
+		end
 	end
 end
 
@@ -83,20 +74,8 @@ local function applyCategoryColor(player, category, color)
 			end
 		end
 	elseif category == "Skin" then
-		_G.PlayerSkinColors[player] = color
-		local bodyParts = {
-			"Head", "Torso", "UpperTorso", "LowerTorso",
-			"Left Arm", "LeftLowerArm", "LeftUpperArm",
-			"Right Arm", "RightLowerArm", "RightUpperArm",
-			"Left Leg", "LeftLowerLeg", "LeftUpperLeg",
-			"Right Leg", "RightLowerLeg", "RightUpperLeg",
-		}
-		for _, partName in ipairs(bodyParts) do
-			local part = char:FindFirstChild(partName)
-			if part and part:IsA("BasePart") then
-				part.Color = color
-			end
-		end
+		PlayerDataManager.setSkinColor(player, color)
+		paintSkinParts(char, color)
 	else
 		local items = equippedItems[player] and equippedItems[player][category]
 		if items then
@@ -277,16 +256,16 @@ local function applyRandomOutfit(player)
 
 	-- Цвета
 	local skinCol = skinColors[rng:NextInteger(1, #skinColors)]
-	applyCategoryColor(player, "Skin", skinCol)   -- _G.PlayerSkinColors обновится внутри applyCategoryColor
+	applyCategoryColor(player, "Skin", skinCol)   -- PlayerDataManager обновится внутри applyCategoryColor
 	print("Цвет кожи:", skinCol)
 
-	local raceCol = getPleasantColor(rng, 0.05)
+	local raceCol = ColorPalettes.getPleasantColor(rng, 0.05)
 	applyCategoryColor(player, "Race", raceCol)
 
 	if equippedItems[player] then
 		for _, cat in ipairs({"Hair","Eyes","FacialHair"}) do
 			if equippedItems[player][cat] then
-				local col = getPleasantColor(rng, 0.07)
+				local col = ColorPalettes.getPleasantColor(rng, 0.07)
 				applyCategoryColor(player, cat, col)
 				print("Цвет", cat, ":", col)
 			end
@@ -295,35 +274,21 @@ local function applyRandomOutfit(player)
 	-- Перезапускаем idle после экипировки: спавн и одежда идут в один момент,
 	-- и трек, запущенный во время передачи владения персонажем клиенту, может
 	-- не отобразиться (тот же механизм, что в ReplaceAvatarWithRig)
-	if _G.ReplayCharacterIdle then
-		task.delay(1, function()
-			if char.Parent then
-				_G.ReplayCharacterIdle(char)
-			end
-		end)
-	end
+	task.delay(1, function()
+		if char.Parent then
+			AnimationController.replayCharacterIdle(char)
+		end
+	end)
 
 	print("<<< applyRandomOutfit завершена")
 end
 
--- Восстановить цвет кожи на персонаже (использует глобальную таблицу)
+-- Восстановить сохранённый цвет кожи на персонаже
 local function applySkinColor(player)
 	local char = player.Character
 	if not char then return end
-	local color = _G.PlayerSkinColors[player] or Color3.new(1,1,1)
-	local bodyParts = {
-		"Head", "Torso", "UpperTorso", "LowerTorso",
-		"Left Arm", "LeftLowerArm", "LeftUpperArm",
-		"Right Arm", "RightLowerArm", "RightUpperArm",
-		"Left Leg", "LeftLowerLeg", "LeftUpperLeg",
-		"Right Leg", "RightLowerLeg", "RightUpperLeg"
-	}
-	for _, partName in ipairs(bodyParts) do
-		local part = char:FindFirstChild(partName)
-		if part and part:IsA("BasePart") then
-			part.Color = color
-		end
-	end
+	local color = PlayerDataManager.getSkinColor(player) or Color3.new(1, 1, 1)
+	paintSkinParts(char, color)
 end
 
 -- ===================== ОБРАБОТЧИК ПОЯВЛЕНИЯ ПЕРСОНАЖА =====================
@@ -396,7 +361,7 @@ Players.PlayerRemoving:Connect(function(player)
 	-- очистка
 	equippedItems[player] = nil
 	categoryColors[player] = nil
-	_G.PlayerSkinColors[player] = nil
+	PlayerDataManager.clearPlayer(player)
 end)
 
 -- ===================== ОБРАБОТЧИКИ REMOTE =====================
@@ -530,7 +495,7 @@ end)
 -- Получение цвета кожи игрока
 local getSkinColorFunction = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
 getSkinColorFunction.OnServerInvoke = function(player)
-	return _G.PlayerSkinColors[player]   -- вернёт nil, если ещё не установлен
+	return PlayerDataManager.getSkinColor(player)   -- вернёт nil, если ещё не установлен
 end
 
 -- Снимок надетых предметов и выбранных цветов. Клиент запрашивает его при
@@ -550,9 +515,10 @@ getEquippedFunction.OnServerInvoke = function(player)
 	for category, color in pairs(categoryColors[player] or {}) do
 		colors[category] = color
 	end
-	-- Кожа хранится в _G (могут писать и другие серверные скрипты) - она приоритетна
-	if _G.PlayerSkinColors[player] then
-		colors.Skin = _G.PlayerSkinColors[player]
+	-- Кожа хранится в PlayerDataManager - она приоритетна над categoryColors
+	local skinColor = PlayerDataManager.getSkinColor(player)
+	if skinColor then
+		colors.Skin = skinColor
 	end
 
 	return equipped, colors

@@ -1,7 +1,20 @@
--- Кастомный спавн персонажа (ServerScriptService)
+--[[
+	Кастомный спавн персонажа (Script в ServerScriptService).
+
+	Отключает автоспавн (Players.CharacterAutoLoads = false) и выдаёт
+	игроку клон рига Male/Female из ServerStorage.Gender со случайным
+	полом. Idle-анимацию перезапускает AnimationController (раньше функция
+	жила в _G.ReplayCharacterIdle).
+
+	Требует в ServerStorage:
+	  Gender.Male, Gender.Female - модели ригов R15
+	  Animations.Idle            - Animation с заполненным AnimationId
+]]
+
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local AnimationController = require(script.Parent:WaitForChild("AnimationController"))
 
 Players.CharacterAutoLoads = false
 
@@ -12,57 +25,6 @@ local femaleRig = genderFolder:WaitForChild("Female")
 
 local spawnPosition = Vector3.new(10, 0, 0)
 local spawnRotation = CFrame.Angles(0, math.rad(90), 0)
-
--- Idle-анимация ищется при каждом спавне, а не один раз при старте скрипта:
--- раньше FindFirstChild молча пропускал анимацию (нет папки, переименована,
--- пустой AnimationId), и персонаж замирал "стойкой смирно" без объяснений
-local function findIdleAnimation()
-	local folder = ServerStorage:FindFirstChild("Animations")
-	if not folder then
-		warn("ReplaceAvatarWithRig: в ServerStorage нет папки 'Animations' - персонаж будет стоять без idle-анимации")
-		return nil
-	end
-	local idle = folder:FindFirstChild("Idle")
-	if not idle then
-		warn("ReplaceAvatarWithRig: в ServerStorage.Animations нет объекта 'Idle' - персонаж будет стоять без idle-анимации")
-		return nil
-	end
-	if not idle:IsA("Animation") then
-		warn("ReplaceAvatarWithRig: ServerStorage.Animations.Idle не является Animation - idle не сыграет")
-		return nil
-	end
-	if idle.AnimationId == "" then
-		warn("ReplaceAvatarWithRig: у ServerStorage.Animations.Idle пустой AnimationId - idle не сыграет")
-		return nil
-	end
-	return idle
-end
-
--- Проигрывает idle заново, останавливая уже идущие треки. Вынесено в _G для
--- серверных скриптов, которые трогают части тела: MaleFemale после
--- ReplaceBodyPartR15 перезапускает idle этим вызовом
-function _G.ReplayCharacterIdle(character)
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-	local idle = findIdleAnimation()
-	if not idle then return end
-
-	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
-	animator.Parent = humanoid
-	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-		track:Stop(0.1)
-	end
-	local ok, err = pcall(function()
-		local idleTrack = animator:LoadAnimation(idle)
-		idleTrack.Looped = true
-		idleTrack:Play()
-	end)
-	if ok then
-		print("Кастомная idle-анимация для " .. character.Name)
-	else
-		warn("ReplaceAvatarWithRig: не удалось запустить idle-анимацию: " .. tostring(err))
-	end
-end
 
 local rng = Random.new()
 
@@ -127,7 +89,7 @@ local function spawnPlayer(player)
 	-- "оживал" только после смены пола - там тот же трек запускался позже)
 	task.delay(0.5, function()
 		if rig.Parent then
-			_G.ReplayCharacterIdle(rig)
+			AnimationController.replayCharacterIdle(rig)
 		end
 	end)
 end

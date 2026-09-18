@@ -1,7 +1,8 @@
 --[[
 	InventoryController - клиентский модуль инвентарей и цветов.
-	ModuleScript: поместить в ReplicatedStorage с именем "InventoryController".
-	Используется локальным скриптом SceneTransition (см. SceneTransition.txt).
+	ModuleScript в ReplicatedStorage с именем "InventoryController".
+	Используется локальным скриптом SceneTransition
+	(src/StarterGui/MainMenuGui/SceneTransition.client.luau).
 
 	Отвечает за: инвентари категорий (одежда, волосы и т.д.), цветовые
 	палитры с ColorPicker, текстовые метки экипировки и рандомайзер.
@@ -19,39 +20,13 @@ local GetEquippedItems = ReplicatedStorage:WaitForChild("GetEquippedItems") -- R
 local ChangePartColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
 local GetPlayerSkinColor = ReplicatedStorage:WaitForChild("GetPlayerSkinColor")
 local ColorPickerModule = require(ReplicatedStorage:WaitForChild("ColorPicker"))
+local ColorPalettes = require(ReplicatedStorage:WaitForChild("ColorPalettes"))
 local itemTemplate = ReplicatedStorage:WaitForChild("Templates"):WaitForChild("InventoryItemTemplate")
 
--- ===================== ПАЛИТРЫ =====================
-local pleasantColors = {
-	Color3.fromRGB(255, 179, 186), Color3.fromRGB(255, 223, 186),
-	Color3.fromRGB(255, 255, 186), Color3.fromRGB(186, 255, 201),
-	Color3.fromRGB(186, 225, 255), Color3.fromRGB(210, 186, 255),
-	Color3.fromRGB(222, 184, 135), Color3.fromRGB(160, 120, 90),
-	Color3.fromRGB(150, 130, 110), Color3.fromRGB(100, 120, 150),
-	Color3.fromRGB(70, 90, 70),    Color3.fromRGB(150, 150, 150),
-	Color3.fromRGB(255, 255, 255), Color3.fromRGB(0, 0, 0),
-	Color3.fromRGB(50, 50, 50),
-}
-local accentColors = {
-	Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
-	Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
-	Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-}
-local skinColors = {
-	Color3.fromRGB(255, 205, 148), Color3.fromRGB(234, 192, 134),
-	Color3.fromRGB(210, 170, 120), Color3.fromRGB(181, 136, 99),
-	Color3.fromRGB(141, 101, 72),  Color3.fromRGB(102, 71, 45),
-	Color3.fromRGB(77, 53, 33),
-}
+-- Палитры общие с сервером (рандомайзер спавна) - см. ReplicatedStorage.ColorPalettes
+local skinColors = ColorPalettes.skinColors
 
 local rng = Random.new()
-local function getPleasantColor()
-	if rng:NextNumber() < 0.07 then
-		return accentColors[rng:NextInteger(1, #accentColors)]
-	else
-		return pleasantColors[rng:NextInteger(1, #pleasantColors)]
-	end
-end
 
 -- ===================== СОСТОЯНИЕ =====================
 local creationGui = nil
@@ -226,12 +201,20 @@ local function switchToMainInventory(targetFrame)
 end
 
 -- ===================== ПОДКЛЮЧЕНИЕ КНОПОК =====================
+-- Проходит цепочку дочерних имей от root: путь до элемента читается одной
+-- строкой вместо серии WaitForChild, и при переименовании узла GUI правка
+-- локализована в одном месте
+local function waitForPath(root: Instance, names: {string}): Instance
+	local current = root
+	for _, name in ipairs(names) do
+		current = current:WaitForChild(name)
+	end
+	return current
+end
+
 -- Подключает кнопку, найденную по пути от CreationMenuGui
 local function connectMainButton(guiPath, targetFrame)
-	local btn = creationGui
-	for _, child in ipairs(guiPath) do
-		btn = btn:WaitForChild(child)
-	end
+	local btn = waitForPath(creationGui, guiPath)
 	-- Activated: работает и с геймпадом (MouseButton1Click - только мышь/тач)
 	btn.Activated:Connect(function()
 		-- Дебаунс: второй клик во время InvokeServer внутри populateInventory
@@ -246,10 +229,7 @@ end
 
 -- Подключает кнопку открытия цветовой палитры
 local function connectColorButton(guiPath, colorPalette, parentInventory, categoryName)
-	local btn = creationGui
-	for _, child in ipairs(guiPath) do
-		btn = btn:WaitForChild(child)
-	end
+	local btn = waitForPath(creationGui, guiPath)
 	btn.Activated:Connect(function()
 		openColorPicker(colorPalette, categoryName, parentInventory)
 	end)
@@ -272,8 +252,11 @@ local function updateEquipText(category, itemName)
 end
 
 -- ===================== ИНИЦИАЛИЗАЦИЯ =====================
--- init(deps): deps = { creationGui = CreationMenuGui }
-function InventoryController.init(deps)
+type InitDeps = {
+	creationGui: ScreenGui,   -- CreationMenuGui из PlayerGui
+}
+
+function InventoryController.init(deps: InitDeps)
 	creationGui = deps.creationGui
 
 	local inventoryContainer = creationGui:WaitForChild("InventoryColor")
@@ -317,7 +300,7 @@ function InventoryController.init(deps)
 	}
 
 	-- Квадратик предпросмотра цвета кожи
-	skinColorFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("Frame")
+	skinColorFrame = waitForPath(creationGui, {"CustomizeLeft", "Frame", "SkinColor", "Frame", "Text", "Frame"})
 	skinColorFrame.BackgroundColor3 = currentCategoryColors.Skin
 
 	-- Запрашиваем у сервера сохранённый цвет кожи (если есть)
@@ -341,7 +324,7 @@ function InventoryController.init(deps)
 	connectMainButton({"CustomizeRight", "Frame", "Mouth", "Frame", "Frame", "MouthButton"}, Inventory1Mouth)
 
 	-- Кнопка цвета кожи (особый случай: палитра без родительского инвентаря)
-	local skinColorButton = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame"):WaitForChild("SkinColor"):WaitForChild("Frame"):WaitForChild("Frame"):WaitForChild("SkinColorButton")
+	local skinColorButton = waitForPath(creationGui, {"CustomizeLeft", "Frame", "SkinColor", "Frame", "Frame", "SkinColorButton"})
 	skinColorButton.Activated:Connect(function()
 		if currentOpenInventory == ColorSkin then
 			-- Повторный клик закрывает палитру одним нажатием
@@ -409,7 +392,7 @@ function InventoryController.init(deps)
 		-- Применяем цвета
 		local colorable = {"Eyes", "Hair", "FacialHair", "Race"}
 		for _, cat in ipairs(colorable) do
-			local col = getPleasantColor()
+			local col = ColorPalettes.getPleasantColor(rng)
 			currentCategoryColors[cat] = col
 			ChangePartColorEvent:FireServer(cat, col)
 		end
@@ -423,18 +406,22 @@ function InventoryController.init(deps)
 		print("Рандомайзер выполнен!")
 	end)
 
-	-- Текстовые метки экипировки
-	local leftFrame = creationGui:WaitForChild("CustomizeLeft"):WaitForChild("Frame")
-	local rightFrame = creationGui:WaitForChild("CustomizeRight"):WaitForChild("Frame")
+	-- Текстовые метки экипировки: TextLabel категории лежит по пути
+	-- <panel>/<Category>/Frame/Text/Text<Category>
+	local leftFrame = waitForPath(creationGui, {"CustomizeLeft", "Frame"})
+	local rightFrame = waitForPath(creationGui, {"CustomizeRight", "Frame"})
+	local function equipLabel(panel: Instance, category: string): TextLabel
+		return waitForPath(panel, {category, "Frame", "Text", "Text" .. category}) :: TextLabel
+	end
 	equipTextLabels = {
-		Race = leftFrame:WaitForChild("Race"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextRace"),
-		Shirt = leftFrame:WaitForChild("Shirt"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextShirt"),
-		Pants = leftFrame:WaitForChild("Pants"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextPants"),
-		Eyes = rightFrame:WaitForChild("Eyes"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextEyes"),
-		Extra = rightFrame:WaitForChild("Extra"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextExtra"),
-		Mouth = rightFrame:WaitForChild("Mouth"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextMouth"),
-		FacialHair = rightFrame:WaitForChild("FacialHair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextFacialHair"),
-		Hair = rightFrame:WaitForChild("Hair"):WaitForChild("Frame"):WaitForChild("Text"):WaitForChild("TextHair"),
+		Race = equipLabel(leftFrame, "Race"),
+		Shirt = equipLabel(leftFrame, "Shirt"),
+		Pants = equipLabel(leftFrame, "Pants"),
+		Eyes = equipLabel(rightFrame, "Eyes"),
+		Extra = equipLabel(rightFrame, "Extra"),
+		Mouth = equipLabel(rightFrame, "Mouth"),
+		FacialHair = equipLabel(rightFrame, "FacialHair"),
+		Hair = equipLabel(rightFrame, "Hair"),
 	}
 
 	-- Сервер подтверждает экипировку - обновляем метки

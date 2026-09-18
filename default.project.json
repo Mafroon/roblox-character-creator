@@ -11,6 +11,7 @@
       "SceneEffects": { "$path": "src/ReplicatedStorage/SceneEffects.luau" },
       "InventoryController": { "$path": "src/ReplicatedStorage/InventoryController.luau" },
       "ElementMenu": { "$path": "src/ReplicatedStorage/ElementMenu.luau" },
+      "ColorPalettes": { "$path": "src/ReplicatedStorage/ColorPalettes.luau" },
 
       "RequestTeleport": { "$className": "RemoteEvent" },
       "ChangeGenderEvent": { "$className": "RemoteEvent" },
@@ -33,7 +34,10 @@
       "InventoryServer": { "$path": "src/ServerScriptService/InventoryServer.server.luau" },
       "Teleport": { "$path": "src/ServerScriptService/Teleport.server.luau" },
       "MaleFemale": { "$path": "src/ServerScriptService/MaleFemale.server.luau" },
-      "ReplaceAvatarWithRig": { "$path": "src/ServerScriptService/ReplaceAvatarWithRig.server.luau" }
+      "ReplaceAvatarWithRig": { "$path": "src/ServerScriptService/ReplaceAvatarWithRig.server.luau" },
+      "PlayerDataManager": { "$path": "src/ServerScriptService/PlayerDataManager.luau" },
+      "AnimationController": { "$path": "src/ServerScriptService/AnimationController.luau" },
+      "RigParts": { "$path": "src/ServerScriptService/RigParts.luau" }
     },
 
     "ReplicatedFirst": {
@@ -52,7 +56,13 @@
       "MainMenuGui": {
         "$className": "ScreenGui",
         "$ignoreUnknownInstances": true,
-        "SceneTransition": { "$path": "src/StarterGui/MainMenuGui/SceneTransition.client.luau" }
+        "SceneTransition": { "$path": "src/StarterGui/MainMenuGui/SceneTransition.client.luau" },
+        "CameraLockScript": { "$path": "src/StarterGui/MainMenuGui/CameraLockScript.client.luau" },
+        "MainContainer": {
+          "$className": "Frame",
+          "$ignoreUnknownInstances": true,
+          "SlotHover": { "$path": "src/StarterGui/MainMenuGui/MainContainer/SlotHover.client.luau" }
+        }
       },
 
       "ElementMenuGui": {

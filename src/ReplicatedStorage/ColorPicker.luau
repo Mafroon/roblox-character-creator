@@ -1,21 +1,36 @@
--- ReplicatedStorage.ColorPicker
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+--[[
+	ColorPicker - HSV/RGB-пикер цвета для палитр кастомизации.
+	ModuleScript в ReplicatedStorage с именем "ColorPicker".
+
+	Используется InventoryController (каждая палитра открывает свой пикер).
+
+	Слайдеры работают на UserInputService.InputChanged/InputEnded, а не на
+	цикле while + RenderStepped: значение обновляется только при реальном
+	движении указателя, поток не крутится каждый кадр, а освобождение
+	кнопки ловится глобально - если отпустить её за пределами слайдера,
+	GuiObject.InputEnded не прилетит и перетаскивание "залипнет".
+
+	new(pickerGui, initialColor, onColorChanged, onClosed):
+	  onColorChanged(color: Color3) - при любом изменении цвета
+	  onClosed()                   - при закрытии (accept или cancel)
+]]
+
+local UserInputService = game:GetService("UserInputService")
 
 local ColorPicker = {}
 ColorPicker.__index = ColorPicker
 
--- new(pickerGui, initialColor, onColorChanged, onClosed)
--- onColorChanged вызывается с новым цветом (Color3) при любом изменении
--- onClosed вызывается без аргументов, когда пикер закрывается (accept или cancel)
-function ColorPicker.new(pickerGui, initialColor, onColorChanged, onClosed)
+type Connections = {RBXScriptConnection}
+
+function ColorPicker.new(pickerGui: Instance, initialColor: Color3,
+	onColorChanged: ((Color3) -> ())?, onClosed: (() -> ())?)
 	local self = setmetatable({}, ColorPicker)
 	self._pickerGui = pickerGui
 	self._h, self._s, self._v = initialColor:ToHSV()
 	self._initialColor = initialColor
 	self._onColorChanged = onColorChanged
 	self._onClosed = onClosed
-	self._connections = {}
+	self._connections = {} :: Connections
 	self._isDestroyed = false
 
 	-- Структура палитры
@@ -81,38 +96,58 @@ function ColorPicker:_fireColorChanged()
 	end
 end
 
-function ColorPicker:_bindEvents()
-	local player = Players.LocalPlayer
-	local mouse = player:GetMouse()
+-- Пересчитать координату экрана в компонент HSV (0..1) и применить
+function ColorPicker:_applySliderValue(slider: GuiObject, component: string, screenX: number)
+	if slider.AbsoluteSize.X <= 0 then return end
+	local relX = math.clamp(screenX - slider.AbsolutePosition.X, 0, slider.AbsoluteSize.X)
+	self["_"..component] = relX / slider.AbsoluteSize.X
+	self:UpdateUI()
+	self:_fireColorChanged()
+end
 
-	-- Слайдеры
-	local function onSliderInput(slider, component)
-		local holding = false
-		local conn1 = slider.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				holding = true
-				-- Проверяем _isDestroyed: Destroy() отключает InputEnded,
-				-- и без этой проверки цикл крутился бы каждый кадр вечно
-				while holding and not self._isDestroyed do
-					local relX = math.clamp(mouse.X - slider.AbsolutePosition.X, 0, slider.AbsoluteSize.X)
-					self["_"..component] = relX / slider.AbsoluteSize.X
-					self:UpdateUI()
-					self:_fireColorChanged()
-					RunService.RenderStepped:Wait()
-				end
+function ColorPicker:_bindEvents()
+	-- Активное перетаскивание: какой слайдер и какой компонент HSV
+	local activeSlider: GuiObject? = nil
+	local activeComponent: string? = nil
+
+	local function isPress(input: InputObject): boolean
+		return input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+	end
+
+	-- Слайдеры: значение по нажатию, дальше - по движению указателя
+	local function onSliderInput(slider: GuiObject, component: string)
+		local conn = slider.InputBegan:Connect(function(input)
+			if isPress(input) and not self._isDestroyed then
+				activeSlider = slider
+				activeComponent = component
+				self:_applySliderValue(slider, component, input.Position.X)
 			end
 		end)
-		local conn2 = slider.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				holding = false
-			end
-		end)
-		table.insert(self._connections, conn1)
-		table.insert(self._connections, conn2)
+		table.insert(self._connections, conn)
 	end
 	onSliderInput(self._hueBar, "h")
 	onSliderInput(self._satBar, "s")
 	onSliderInput(self._valBar, "v")
+
+	local connMove = UserInputService.InputChanged:Connect(function(input)
+		if not activeSlider or not activeComponent then return end
+		if input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch then
+			self:_applySliderValue(activeSlider, activeComponent, input.Position.X)
+		end
+	end)
+	table.insert(self._connections, connMove)
+
+	-- Отпускание слушаем глобально: GuiObject.InputEnded не придёт, если
+	-- кнопка отпущена за пределами слайдера
+	local connRelease = UserInputService.InputEnded:Connect(function(input)
+		if isPress(input) then
+			activeSlider = nil
+			activeComponent = nil
+		end
+	end)
+	table.insert(self._connections, connRelease)
 
 	-- Ввод HSV
 	for component, input in pairs(self._hsvInputs) do
