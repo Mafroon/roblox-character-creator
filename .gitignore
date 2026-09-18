@@ -4,5 +4,13 @@ Desktop.ini
 *.tmp
 *~
 
+# Rojo build artifacts
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+
+# Local working files (recommendation docs etc.) - not part of the sources
+*.docx
+
 # ZCode session artifacts
 .zcode/
