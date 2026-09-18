@@ -1,5 +1,7 @@
 # rb_scripts — Roblox Character Creation & Element Selection
 
+[![CI](https://github.com/Mafroon/roblox-character-creator/actions/workflows/ci.yml/badge.svg)](https://github.com/Mafroon/roblox-character-creator/actions/workflows/ci.yml)
+
 Luau sources for a Roblox character-creation lobby: gender and race
 customization, clothing/hair inventories with live color palettes (custom
 HSV/RGB picker), an element-selection menu with a cinematic final
