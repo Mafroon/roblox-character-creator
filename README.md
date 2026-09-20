@@ -1,124 +1,102 @@
-# rb_scripts — Roblox Character Creation & Element Selection
+# rb_scripts — Создание персонажа и выбор стихии в Roblox
 
 [![CI](https://github.com/Mafroon/roblox-character-creator/actions/workflows/ci.yml/badge.svg)](https://github.com/Mafroon/roblox-character-creator/actions/workflows/ci.yml)
 
-Luau sources for a Roblox character-creation lobby: gender and race
-customization, clothing/hair inventories with live color palettes (custom
-HSV/RGB picker), an element-selection menu with a cinematic final
-transition, and a teleport into the main game place.
+Исходный код на Luau для лобби создания персонажа в Roblox: настройка пола и расы, 
+инвентарь одежды/волос с цветовыми палитрами (кастомный HSV/RGB пикер), 
+меню выбора стихии с финальным переходом и телепортация в основную игру.
 
-Managed as a [Rojo](https://rojo.space) project: `default.project.json`
-maps the `src/` tree into Studio containers, so the scripts hot-sync into
-a live Studio session while the GUI itself is hand-built in the place
-file.
+Управляется как проект [Rojo](https://rojo.space): `default.project.json` 
+сопоставляет дерево `src/` с контейнерами Studio, чтобы скрипты синхронизировались 
+в реальном времени с активной сессией Studio, в то время как сам GUI создается 
+вручную в файле места (place file).
 
-## Features
+## Возможности
 
-- **Custom character spawn** — `CharacterAutoLoads = false`; the player
-  receives a cloned R15 rig (random gender) from `ServerStorage.Gender`,
-  pinned in place with a custom idle animation.
-- **Full customization editor** — inventories for Shirt / Pants / Eyes /
-  Mouth / Hair / FacialHair / Extra / Race, equip labels, a one-click
-  randomizer with weighted probabilities, and per-category color
-  palettes backed by a custom HSV/RGB `ColorPicker`.
-- **Gender swap in place** — torsos are replaced via
-  `Humanoid:ReplaceBodyPartR15`, skin color is preserved and the idle
-  animation is restarted.
-- **Element menu** — six elements with info frames, hover highlights,
-  "your choice" preview, and a camera fly-through finale that requests a
-  teleport with the chosen element (validated against a whitelist).
-- **Loading screen** — `ReplicatedFirst` override with gradient
-  animation and an emergency-abort path that always unlocks the session.
+- **Кастомный спавн персонажа** — `CharacterAutoLoads = false`; игрок получает клонированный R15-риг (случайного пола) из `ServerStorage.Gender`, зафиксированный на месте с помощью кастомной анимации ожидания (idle).
+- **Полноценный редактор внешности** — инвентари для рубашек / штанов / глаз / рта / волос / растительности на лице / дополнительных элементов / расы, метки экипировки, рандомайзер в один клик с взвешенными вероятностями и цветовые палитры для каждой категории на базе кастомного HSV/RGB `ColorPicker`.
+- **Смена пола на месте** — торсы заменяются через `Humanoid:ReplaceBodyPartR15`, цвет кожи сохраняется, а анимация ожидания перезапускается.
+- **Меню стихий** — шесть стихий с информационными фреймами, подсветкой при наведении, превью «ваш выбор» и кинематографичным пролетом камеры в финале, который запрашивает телепортацию с выбранной стихией (проверяется по белому списку).
+- **Экран загрузки** — переопределение `ReplicatedFirst` с градиентной анимацией и аварийным путем прерывания, который всегда разблокирует сессию.
 
-## Architecture
+## Архитектура
 
-Client/server split follows standard Roblox practice: gameplay/security
-logic lives in server Scripts, all UI logic in LocalScripts; the client
-talks to the server exclusively through the remotes declared in
-`default.project.json` (they are created automatically on a fresh Rojo
-connect). Client↔client signals use `BindableEvent`s.
+Разделение клиент/сервер следует стандартной практике Roblox: логика геймплея и безопасности находится в серверных скриптах (Scripts), вся логика UI — в локальных скриптах (LocalScripts); клиент общается с сервером исключительно через remotes, объявленные в `default.project.json` (они создаются автоматически при свежем подключении Rojo). Сигналы между клиентами используют `BindableEvent`.
+
 
 ```
 ReplicatedStorage (ModuleScripts + remotes)
-├─ ColorPicker          HSV/RGB picker class (event-driven sliders)
-├─ ColorPalettes        shared palettes for server randomizer & client randomizer
-├─ SceneEffects         menu show/hide tweens + camera yaw rig
-├─ InventoryController  inventories, palettes, equip labels, randomizer
-└─ ElementMenu          element info frames + shared ELEMENTS config
+├─ ColorPicker          класс HSV/RGB пикера (слайдеры на основе событий)
+├─ ColorPalettes        общие палитры для серверного и клиентского рандомайзеров
+├─ SceneEffects         твины показа/скрытия меню + риг горизонтального вращения камеры
+├─ InventoryController  инвентари, палитры, метки экипировки, рандомайзер
+└─ ElementMenu          информационные фреймы стихий + общая конфигурация ELEMENTS
 
 ServerScriptService
-├─ ReplaceAvatarWithRig custom R15 spawn (CharacterAutoLoads = false)
-├─ InventoryServer      equip/unequip, races, recoloring, spawn outfit
-├─ MaleFemale           gender swap (ReplaceBodyPartR15, skin preserved)
-├─ Teleport             whitelisted teleport with SetTeleportData
-├─ PlayerDataManager    per-player state (skin colors) — replaces _G
-├─ AnimationController  idle replay shared by the scripts above
-└─ RigParts             R15 body-part names for skin repaint
+├─ ReplaceAvatarWithRig кастомный спавн R15 (CharacterAutoLoads = false)
+├─ InventoryServer      экипировка/снятие, расы, перекраска, стартовый наряд
+├─ MaleFemale           смена пола (ReplaceBodyPartR15, цвет кожи сохраняется)
+├─ Teleport             телепортация по белому списку с SetTeleportData
+├─ PlayerDataManager    состояние для каждого игрока (цвета кожи) — заменяет _G
+├─ AnimationController  повтор анимации ожидания, используемый скриптами выше
+└─ RigParts             имена частей тела R15 для перекраски кожи
 
 ReplicatedFirst
-└─ LoadingScript        custom loading screen + StartGameEvent handshake
+└─ LoadingScript        кастомный экран загрузки + рукопожатие (handshake) StartGameEvent
 
 StarterGui
-├─ HoverBorder          CollectionService-tagged button borders
-├─ MainMenuGui          CameraLockScript, SlotHover (Slot1–3 hover FX),
-│                       SceneTransition — the client orchestrator
-├─ ElementMenuGui       HoverBorder2 — element choice → ElementChosenEvent
-└─ CreationMenuGui      RotateScript — turntable character rotation
+├─ HoverBorder          границы кнопок с тегами CollectionService
+├─ MainMenuGui          CameraLockScript, SlotHover (эффекты наведения Slot1–3),
+│                       SceneTransition — клиентский оркестратор
+├─ ElementMenuGui       HoverBorder2 — выбор стихии → ElementChosenEvent
+└─ CreationMenuGui      RotateScript — вращение персонажа на подиуме
 ```
 
-Every script starts with a header comment (in Russian) describing its
-purpose, dependencies, and the contract with its neighbors.
+Каждый скрипт начинается с заголовочного комментария, описывающего его назначение, зависимости и контракт взаимодействия с соседними скриптами.
 
-### Security notes
+### Примечания по безопасности
 
-All client→server remotes validate their arguments against whitelists:
-equip/color categories (`VALID_EQUIP_CATEGORIES`), teleport elements
-(`VALID_ELEMENTS`), and gender (`"male"/"female"`). The chosen element
-travels to the destination place via
+Все клиент→серверные remotes проверяют свои аргументы по белым спискам: категории экипировки/цвета (`VALID_EQUIP_CATEGORIES`), стихии для телепортации
+(`VALID_ELEMENTS`), и пол (`"male"/"female"`). Выбранная стихия отправляется в место назначения через
 `TeleportOptions:SetTeleportData({ element = ... })`.
 
-## Setup
+## Установка
 
-Requirements: [Rokit](https://github.com/rojo-rbx/rokit) toolchain
-(Rojo 7.6.1 pinned in `rokit.toml`) and Roblox Studio.
+Требования: набор инструментов [Rokit](https://github.com/rojo-rbx/rokit) (версия Rojo 7.6.1 зафиксирована в `rokit.toml`) и Roblox Studio.
 
 ```bash
-git clone <this repo>
+git clone <этот репозиторий>
 cd rb_scripts
-rokit install          # installs the pinned Rojo
-rojo serve             # start the sync server (port 34872)
+rokit install          # устанавливает зафиксированную версию Rojo
+rojo serve             # запускает сервер синхронизации (порт 34872)
 ```
 
-Then in Studio: open your place → **Plugins → Rojo → Connect**. All
-scripts and remotes appear in the DataModel; further edits to `src/**`
-hot-sync.
+Затем в Studio: откройте ваше место (place) → Плагины (Plugins) → Rojo → Подключиться (Connect). Все скрипты и remotes появятся в DataModel; дальнейшие правки в `src/**` будут синхронизироваться в реальном времени (hot-sync).
 
-### Expected place contents (hand-built, not in this repo)
+### Ожидаемое содержимое места (создается вручную, отсутствует в этом репозитории)
 
-| Instance | Purpose |
+| Экземпляр | Назначение |
 |---|---|
-| `ServerStorage.Gender.Male` / `.Female` | R15 rig templates |
-| `ServerStorage.Animations.Idle` | `Animation` with a valid `AnimationId` |
-| `ServerStorage.Race.<RaceName>` | folders of race attachments |
-| `ServerStorage.Shirt/Pants/Eyes/...` | item folders per category |
-| `ReplicatedStorage.Templates.InventoryItemTemplate` | inventory cell template |
+| `ServerStorage.Gender.Male` / `.Female` | шаблоны R15-ригов |
+| `ServerStorage.Animations.Idle` | объект `Animation` с валидным `AnimationId` |
+| `ServerStorage.Race.<RaceName>` | папки с аттачментами рас |
+| `ServerStorage.Shirt/Pants/Eyes/...` | папки предметов по категориям |
+| `ReplicatedStorage.Templates.InventoryItemTemplate` | шаблон ячейки инвентаря |
 | `StarterGui` GUIs | `MainMenuGui`, `CreationMenuGui`, `ElementMenuGui`, `EntranceGui` |
-| `ReplicatedFirst.LoadingScreen` | loading screen template |
+| `ReplicatedFirst.LoadingScreen` | шаблон экрана загрузки |
 
-The destination place id is hardcoded in
+ID места назначения жестко прописан в
 `src/ServerScriptService/Teleport.server.luau` (`GAME_PLACE_ID`).
 
-## Conventions
+## Соглашения
 
-- Sources are **UTF-8 with CRLF**; comments and log messages are in
-  Russian. Git stores them byte-for-byte (`*.luau -text` in
+- Исходный код в кодировке **UTF-8 with CRLF**; комментарии и сообщения логов написаны на русском языке. Git хранит их побайтово (`*.luau -text` in
   `.gitattributes`).
-- Shared state between server scripts goes through ModuleScripts
-  (`PlayerDataManager`, `AnimationController`) — `_G` is not used.
-- Rojo naming: `*.server.luau` → `Script`, `*.client.luau` →
-  LocalScript, `*.luau` → ModuleScript. New shared modules must also be
-  declared in `default.project.json`.
+- Общее состояние между серверными скриптами передается через ModuleScripts
+  (`PlayerDataManager`, `AnimationController`) — `_G` не используется.
+- Именование для Rojo: `*.server.luau` → `Script`, `*.client.luau` →
+  LocalScript, `*.luau` → ModuleScript. Новые общие модули также должны быть объявлены в `default.project.json`.
 
-## License
+## Лицензия
 
-[MIT](LICENSE) — free to reuse with attribution.
+[MIT](LICENSE) — свободное использование с указанием авторства.
