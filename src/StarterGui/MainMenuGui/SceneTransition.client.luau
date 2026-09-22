@@ -163,7 +163,7 @@ local function applyGender(gender: string)
 	end
 end
 
--- Activated вместо MouseButton1Click: работает и с геймпадом/тачем (M3)
+-- Activated вместо MouseButton1Click: работает и с геймпадом/тачем
 maleButton.Activated:Connect(function() applyGender("male") end)
 femaleButton.Activated:Connect(function() applyGender("female") end)
 
@@ -311,7 +311,7 @@ local function transitionToFinal(chosenElement)
 
 	-- === EntranceGui нужен для перехода: проверяем ДО скрытия меню ===
 	-- Иначе при отсутствии экземпляра WaitForChild висит вечно, а меню уже
-	-- спрятаны - игровой процесс заблокирован навсегда (bugs_2.md, L4)
+	-- спрятаны - игровой процесс заблокирован навсегда
 	local entranceGui = playerGui:WaitForChild("EntranceGui", 10)
 	local entranceBackFrame = entranceGui and entranceGui:FindFirstChild("BackFrame")
 	local entranceFrame = entranceGui and entranceGui:FindFirstChild("Frame")
@@ -322,7 +322,7 @@ local function transitionToFinal(chosenElement)
 		return
 	end
 
-	-- === Восстановление после неудачной телепортации (bugs_2.md, M2) ===
+	-- === Восстановление после неудачной телепортации ===
 	-- Возвращаем фон, меню стихий (выбор в HoverBorder2 сохранён) и камеру
 	restoreAfterTeleportFailure = function()
 		local backInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -455,7 +455,7 @@ local function transitionToFinal(chosenElement)
 
 			-- Телепортируем только когда анимация полностью доиграла:
 			-- раньше запрос уходил на 0.7с раньше окончания движения и проявления
-			-- EntranceGui (bugs_2.md, L5)
+			-- EntranceGui
 			local requestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport", 10)
 			if requestTeleport then
 				requestTeleport:FireServer(chosenElement) -- chosenElement - имя выбранной стихии
