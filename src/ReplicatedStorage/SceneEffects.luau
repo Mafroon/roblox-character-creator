@@ -36,7 +36,7 @@ end
 
 -- Во всех Completed-обработчиках ниже проверяем playbackState: Completed
 -- срабатывает и при отмене твина (см. ElementMenu), а прятать панели по отмене
--- нельзя (подробности - в important_docs/bugs_2.md, L3)
+-- нельзя
 
 -- Показ редактора персонажа (из главного меню или из меню стихий)
 function SceneEffects.showCreationUI()
