@@ -3,7 +3,7 @@
 
 	ВАЖНО: это не устаревшая альтернатива HoverBorder, а НЕОБХОДИМЫЙ скрипт -
 	единственный, кто передаёт выбор стихии дальше: PlayButton -> ElementChosenEvent.
-	Без него финальный переход (SceneTransition) недостижим - не удалять.
+	Без него финальный переход (SceneTransition) недостижим.
 
 	Требует в ReplicatedStorage ДВА BindableEvent (не RemoteEvent!):
 	  - ElementChosenEvent       - выбор стихии отсюда в SceneTransition
@@ -34,8 +34,7 @@ local function brightenColor(color: Color3, factor: number): Color3
 end
 
 -- Конфигурация стихий берётся из модуля ElementMenu (ElementMenu.ELEMENTS):
--- единственный источник имён и цветов - раньше копия таблицы здесь могла
--- разъехаться с меню
+-- единственный источник имён и цветов
 local ELEMENT_CONFIG: {[string]: ElementMenuModule.ElementConfig} = {}
 for _, element in ipairs(ElementMenuModule.ELEMENTS) do
 	ELEMENT_CONFIG[element.button] = element
@@ -142,9 +141,7 @@ end
 -- ===== ВЫБОР СТИХИЙ =====
 -- Кнопки стихий подключает модуль ElementMenu (он же открывает инфо-фреймы).
 -- Сюда приходит готовое решение: (кнопка, выбрана/снята) - и подсветка, и
--- "Ваш выбор", и описание стихии живут по одному решению. Раньше у этого
--- скрипта был собственный обработчик с отдельным фильтром кликов, и из-за
--- расхождения фильтров выбор мог теряться молча.
+-- "Ваш выбор", и описание стихии живут по одному решению.
 if ElementMenuModule.onElementToggled then
 	ElementMenuModule.onElementToggled(function(button, isSelected)
 		if isSelected then
