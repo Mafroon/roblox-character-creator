@@ -5,7 +5,7 @@
 	Серверная часть кастомизации: случайный набор одежды на спавне,
 	экипировка/снятие предметов и рас, перекраска категорий и кожи.
 	Цвет кожи хранится в PlayerDataManager, перезапуск idle - в
-	AnimationController (раньше оба шли через _G).
+	AnimationController.
 
 	Требует в ReplicatedStorage RemoteFunction "GetEquippedItems" - снимок
 	надетых предметов и цветов категорий для клиента (InventoryController.init).
@@ -25,8 +25,6 @@ local equippedItems = {}           -- [player] = { [category] = {item, ...} }
 local categoryColors = {}          -- [player] = { [category] = Color3 } - выбранные цвета категорий
 
 -- ===================== REMOTE ОБЪЕКТЫ =====================
--- StartGameEvent здесь НЕ подключаем: это BindableEvent, он не пересекает
--- границу клиент/сервер, серверное подключение никогда бы не сработало
 local equipEvent = ReplicatedStorage:WaitForChild("EquipItem")
 local getItemsFunction = ReplicatedStorage:WaitForChild("GetInventoryItems")
 local changeColorEvent = ReplicatedStorage:WaitForChild("ChangePartColorEvent")
