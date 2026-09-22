@@ -2,14 +2,6 @@
 	AnimationController - серверный перезапуск idle-анимации персонажа.
 	ModuleScript в ServerScriptService с именем "AnimationController".
 
-	Замена бывшей глобальной функции _G.ReplayCharacterIdle: вызовы между
-	серверными скриптами теперь идут через require, а не через _G.
-
-	Idle ищется в ServerStorage.Animations.Idle при каждом вызове, а не
-	один раз при старте: раньше FindFirstChild молча пропускал анимацию
-	(нет папки, переименована, пустой AnimationId), и персонаж замирал
-	"стойкой смирно" без объяснений.
-
 	Используется из:
 	  - ReplaceAvatarWithRig - спавн (с задержкой: в момент присвоения
 	    player.Character клиент забирает владение ригом, и трек, запущенный
