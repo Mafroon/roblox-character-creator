@@ -112,9 +112,6 @@ customizeText.Visible = false
 leftRight.Visible = false
 randomFrame.Visible = false
 elementMenu.Enabled = false
--- Панели спрятаны до включения GUI: включаем только теперь, иначе после
--- Continue редактор успевает вспыхнуть на экране до того, как панели
--- уедут на стартовые позиции за пределы экрана
 creationGui.Enabled = true
 
 -- ===================== СМЕНА ПОЛА =====================
@@ -196,7 +193,6 @@ local function returnToMenu()
 	SceneEffects.hideCreationUI()
 
 	-- Камера возвращается к прямому виду; разблокируем переход только после её окончания
-	-- (раньше разблокировка происходила по панелям через 0.8с, а камера летит 1.0с)
 	local tweenCam = SceneEffects.tweenCameraYaw(cameraBasePos, -math.pi/2, 0, 1.0)
 	if not tweenCam then
 		isTransitioning = false
