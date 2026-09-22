@@ -237,7 +237,6 @@ end
 
 -- ===================== РАНДОМАЙЗЕР =====================
 local function preloadCategories()
-	-- ИСПРАВЛЕНО: добавлена "Race" для корректной работы рандомайзера
 	local cats = {"Shirt", "Pants", "Extra", "Eyes", "Hair", "FacialHair", "Mouth", "Race"}
 	for _, cat in ipairs(cats) do
 		categoryItemCache[cat] = GetInventoryItems:InvokeServer(cat)
