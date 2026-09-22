@@ -95,8 +95,6 @@ changeGenderEvent.OnServerEvent:Connect(function(player, gender)
 				part.Color = skinColor
 			end
 		end
-		-- Широкую "подстраховку" (перекраска всех BasePart персонажа) убрали:
-		-- она красила бы цветом кожи любой предмет, если тот окажется голым BasePart
 		print("Цвет кожи восстановлен после смены пола")
 	end
 
