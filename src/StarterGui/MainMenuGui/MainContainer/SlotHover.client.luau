@@ -2,9 +2,8 @@
 	SlotHover - hover-эффект слотов персонажей (Slot1-Slot3).
 	LocalScript внутри MainMenuGui.MainContainer.
 
-	Замена трёх одинаковых HoverEffect в Slot1-Slot3: один скрипт обходит
-	слоты и вешает тот же эффект (подсветка обводки + смена текста
-	плейсхолдера). Спец-поведение Slot3 ("Buy Extra Slot") сохранено.
+	Скрипт обходит слоты и вешает тот же эффект (подсветка обводки + смена текста
+	плейсхолдера). И спец-поведение для Slot3 ("Buy Extra Slot").
 ]]
 
 local DEFAULT_COLOR = Color3.fromRGB(206, 167, 62)
@@ -50,7 +49,6 @@ local function applySlotHover(btn: GuiButton)
 			label.Text = defaultText
 		end
 	end)
-	-- Обработчик клика убран (был и в исходных HoverEffect)
 end
 
 for i = 1, 3 do
