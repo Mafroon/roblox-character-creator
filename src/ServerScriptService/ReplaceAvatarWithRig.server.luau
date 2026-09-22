@@ -3,8 +3,7 @@
 
 	Отключает автоспавн (Players.CharacterAutoLoads = false) и выдаёт
 	игроку клон рига Male/Female из ServerStorage.Gender со случайным
-	полом. Idle-анимацию перезапускает AnimationController (раньше функция
-	жила в _G.ReplayCharacterIdle).
+	полом. Idle-анимацию перезапускает AnimationController.
 
 	Требует в ServerStorage:
 	  Gender.Male, Gender.Female - модели ригов R15
@@ -38,7 +37,7 @@ local function spawnPlayer(player)
 
 	-- Animator создаём ДО первого парента рига: треки реплицируются через
 	-- Animator, и если клиент впервые видит персонажа ещё без него, запущенный
-	-- сервером idle может не доехать (персонаж замирал до смены пола)
+	-- сервером idle может не доехать
 	local humanoidEarly = rig:FindFirstChildOfClass("Humanoid")
 	if humanoidEarly and not humanoidEarly:FindFirstChildOfClass("Animator") then
 		Instance.new("Animator").Parent = humanoidEarly
@@ -85,8 +84,7 @@ local function spawnPlayer(player)
 
 	-- Проигрываем idle-анимацию. Задержка не случайна: в момент присвоения
 	-- player.Character клиент забирает владение ригом, и трек, запущенный
-	-- сервером в это же окно, до клиента доезжает не всегда (поэтому персонаж
-	-- "оживал" только после смены пола - там тот же трек запускался позже)
+	-- сервером в это же окно, до клиента доезжает не всегда
 	task.delay(0.5, function()
 		if rig.Parent then
 			AnimationController.replayCharacterIdle(rig)
